@@ -92,14 +92,27 @@ struct LibraryView: View {
     }
 
     private var emptyState: some View {
-        ContentUnavailableView {
-            Label("No Books", systemImage: "books.vertical")
-        } description: {
-            Text("Import an EPUB to start reading.")
-        } actions: {
-            Button("Import a Book…") { showingFileImporter = true }
-                .buttonStyle(.borderedProminent)
-            Button("Add Sample Book") { Task { await viewModel.importSample() } }
+        VStack(spacing: 22) {
+            Image("BookArtwork")
+                .resizable()
+                .aspectRatio(contentMode: .fit)
+                .frame(width: 140, height: 140)
+                .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
+                .shadow(color: .black.opacity(0.18), radius: 10, y: 5)
+
+            VStack(spacing: 6) {
+                Text("No Books")
+                    .font(.title2.weight(.semibold))
+                Text("Import an EPUB to start reading.")
+                    .foregroundStyle(.secondary)
+            }
+
+            VStack(spacing: 12) {
+                Button("Import a Book…") { showingFileImporter = true }
+                    .buttonStyle(.borderedProminent)
+                Button("Add Sample Book") { Task { await viewModel.importSample() } }
+            }
         }
+        .padding()
     }
 }

@@ -86,6 +86,9 @@ A single 1024×1024 opaque icon is supplied; the system generates all sizes and
 applies the rounded mask. (A future enhancement is a layered Icon Composer `.icon`
 for the iOS 26+ Liquid Glass / tinted-icon treatments.)
 
+The library empty-state uses the `BookArtwork` image asset — an open-book render
+generated with OpenAI `gpt-image-1` (source kept at `Icon/generated/openai-icon.png`).
+
 ## Build & run
 
 ```sh
