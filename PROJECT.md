@@ -12,6 +12,16 @@ reopen to that exact location. Nothing else — no auth, cloud, AI, TTS, or DRM.
 
 ## Foundational decisions
 
+### Platform: iOS 27, Swift 6 with complete strict concurrency
+Deployment floor is **iOS 27.0** — the app targets the current generation, so it
+adopts the latest APIs (Liquid Glass, newest SwiftUI/SwiftData) unconditionally,
+with no `if #available` back-compat code. The app target builds under
+**`SWIFT_STRICT_CONCURRENCY: complete`** with zero warnings in our code; Readium's
+non-`Sendable` `Publication` is confined to the `ReadiumStack` boundary (the reader
+gets a live publication on the main actor; import gets a `Sendable` snapshot), so it
+never crosses an isolation domain. (`ReaderCore` keeps a lower floor — iOS 17 /
+macOS 14 — to stay maximally reusable by future clients.)
+
 ### Rendering engine: Readium Swift Toolkit
 The only actively-maintained native OSS toolkit with a **standardized, serializable
 `Locator`** position model — the exact primitive cross-device resume needs.

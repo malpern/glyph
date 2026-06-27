@@ -1,17 +1,15 @@
 import Foundation
 import CryptoKit
-import UIKit
-import ReadiumShared
 import ReaderCore
 
-/// Imports an EPUB into the local library: parse → derive a stable identity →
+/// Imports an EPUB into the local library: inspect → derive a stable identity →
 /// copy the file and cover into the app container → persist a `Book`.
 ///
-/// Depends only on the `LibraryRepository` protocol and the Readium boundary, so
-/// it has no knowledge of SwiftData. `Sendable` and free of stored mutable state,
-/// so it runs off the main actor.
+/// Depends only on the `LibraryRepository` protocol and the Readium boundary's
+/// `Sendable` snapshot — it never holds a Readium `Publication`, so it's `Sendable`
+/// and runs off the main actor (good for the file I/O).
 struct BookImporter: Sendable {
-    let library: LibraryRepository
+    let library: any LibraryRepository
     let storage: BookStorage
 
     @discardableResult
@@ -20,33 +18,29 @@ struct BookImporter: Sendable {
         let scoped = sourceURL.startAccessingSecurityScopedResource()
         defer { if scoped { sourceURL.stopAccessingSecurityScopedResource() } }
 
-        let publication = try await ReadiumStack.open(at: sourceURL)
+        let meta = try await ReadiumStack.inspect(at: sourceURL)
         let fileData = try Data(contentsOf: sourceURL)
 
         // Content-derived identity (see PROJECT.md): prefer the EPUB's own
         // dc:identifier so the same book matches across devices; fall back to a
         // file hash. The on-disk filename is a hash of the id, so it's always
         // filesystem-safe regardless of what the identifier contains.
-        let bookID = stableID(identifier: publication.metadata.identifier, fileData: fileData)
+        let bookID = stableID(identifier: meta.identifier, fileData: fileData)
         let key = Self.hex(SHA256.hash(data: Data(bookID.utf8)))
 
         let bookRel = storage.bookRelativePath(key: key)
-        let bookURL = storage.absoluteURL(for: bookRel)
-        try? FileManager.default.removeItem(at: bookURL)        // re-import overwrites
-        try fileData.write(to: bookURL, options: .atomic)
+        try? FileManager.default.removeItem(at: storage.absoluteURL(for: bookRel))   // re-import overwrites
+        try fileData.write(to: storage.absoluteURL(for: bookRel), options: .atomic)
 
         var coverRel: String?
-        let coverImage = (try? await publication.cover().get()) ?? nil
-        if let coverImage, let png = coverImage.pngData() {
+        if let png = meta.coverPNG {
             let rel = storage.coverRelativePath(key: key)
             try? png.write(to: storage.absoluteURL(for: rel), options: .atomic)
             coverRel = rel
         }
 
-        let title = publication.metadata.title ?? sourceURL.deletingPathExtension().lastPathComponent
-        let author = publication.metadata.authors.first?.name
-
-        let book = Book(id: bookID, title: title, author: author, coverPath: coverRel, filePath: bookRel)
+        let title = meta.title ?? sourceURL.deletingPathExtension().lastPathComponent
+        let book = Book(id: bookID, title: title, author: meta.author, coverPath: coverRel, filePath: bookRel)
         try await library.upsert(book)
         return book
     }

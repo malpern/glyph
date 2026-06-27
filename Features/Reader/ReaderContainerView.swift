@@ -16,12 +16,20 @@ struct ReaderContainerView: View {
     }
 
     var body: some View {
-        ZStack(alignment: .top) {
-            Color(.systemBackground).ignoresSafeArea()
+        NavigationStack {
             content
-            if showChrome { topBar.transition(.move(edge: .top).combined(with: .opacity)) }
+                .navigationTitle(viewModel.book.title)
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .topBarLeading) {
+                        Button("Close", systemImage: "chevron.left") { close() }
+                    }
+                }
+                // Native Liquid Glass nav bar that auto-hides for distraction-free
+                // reading; tapping the page toggles it.
+                .toolbarVisibility(showChrome ? .visible : .hidden, for: .navigationBar)
+                .statusBarHidden(!showChrome)
         }
-        .statusBarHidden(!showChrome)
         .task { await viewModel.load() }
     }
 
@@ -43,24 +51,6 @@ struct ReaderContainerView: View {
             )
             .ignoresSafeArea()
         }
-    }
-
-    private var topBar: some View {
-        HStack(spacing: 12) {
-            Button { close() } label: {
-                Image(systemName: "chevron.left")
-                    .font(.body.weight(.semibold))
-            }
-            .accessibilityLabel("Close book")
-
-            Text(viewModel.book.title)
-                .font(.subheadline.weight(.medium))
-                .lineLimit(1)
-            Spacer()
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 10)
-        .background(.bar)
     }
 
     private func close() {
