@@ -55,6 +55,12 @@ project.yml     XcodeGen source of truth. The .xcodeproj is generated, not commi
 Dependency direction is one-way: **Features → ReaderCore**. Readium + UIKit stay at the
 app/reader edge (the navigator bridge), never inside `ReaderCore`.
 
+## Readium dependencies (Phase 1)
+
+`ReadiumShared`, `ReadiumStreamer`, `ReadiumNavigator`. The EPUB navigator in
+Readium 3.10 no longer needs an HTTP server, so `ReadiumAdapterGCDWebServer` was
+dropped. `ReadiumOPDS` / `ReadiumLCP` are intentionally absent.
+
 ## Build & run
 
 ```sh
@@ -66,9 +72,30 @@ open Reader.xcodeproj
 swift test --package-path Packages/ReaderCore   # Core unit tests
 ```
 
-## Status
+DEBUG-only launch hooks drive headless simulator verification (never in release):
+`SIMCTL_CHILD_READER_AUTODEMO=1` imports the bundled sample, `…_AUTOOPEN=1` opens
+it, `…_AUTOADVANCE=N` turns N pages through the real navigator → save path.
 
-- **M1 — Scaffold:** in progress.
-- M2 Core domain + persistence · M3 Import · M4 Library · M5 Reader · M6 Resume · M7 Polish.
+## Status — Phase 1 complete
+
+All seven milestones built, committed, and verified on the iPhone 17 simulator:
+
+| # | Milestone | Verified by |
+|---|---|---|
+| M1 | Scaffold (XcodeGen, ReaderCore, Readium) | empty app builds + launches |
+| M2 | Core domain + SwiftData behind repositories | 7 round-trip unit tests |
+| M3 | Import (Readium parse, stable bookID, cover) | sample imports with real cover/metadata |
+| M4 | Library UI | cover grid renders |
+| M5 | Reader (Readium navigator bridge) | live EPUB rendering |
+| M6 | Locator-based resume | **read to Ch. VI → relaunch → resumed to Ch. VI** |
+| M7 | Polish + this doc | clean Swift-6 build, no warnings in app code |
+
+### Phase 2 seams (already in place)
+- **Sync engine** plugs in behind `LibraryRepository` / `ReadingStateRepository`;
+  records already carry `updatedAt` + `deletedAt` tombstones, `ReadingState` carries
+  `pendingSync`. No CloudKit (non-Apple device target).
+- **Shared clients** (iPad/Mac): `ReaderCore` is UI-free and Readium-free — reusable as-is.
+- **TTS / highlights / notes**: positions are Readium `Locator`s end to end; `Bookmark`
+  and `Highlight` models and storage already exist (unused in Phase 1).
 
 See `/Users/malpern/.claude/plans/dreamy-beaming-sphinx.md` for the full plan.

@@ -5,7 +5,9 @@ import Foundation
 /// Round-trip tests for the SwiftData-backed repositories, run against an
 /// in-memory store. They pin the persistence contract the rest of the app relies
 /// on: live/tombstone semantics, locator round-tripping, and child upserts.
-@Suite struct PersistenceTests {
+// Serialized: each test builds its own ModelContainer, and running them in
+// parallel can occasionally race inside SwiftData. They're fast, so serial is free.
+@Suite(.serialized) struct PersistenceTests {
 
     private func makeStore() throws -> SwiftDataStore {
         try ReaderStore.make(inMemory: true)
