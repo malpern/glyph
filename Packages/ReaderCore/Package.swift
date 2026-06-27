@@ -7,7 +7,10 @@ import PackageDescription
 // iPad/Mac clients and keeps the dependency direction one-way (Features -> Core).
 let package = Package(
     name: "ReaderCore",
-    platforms: [.iOS(.v17)],
+    // macOS is included so `swift test` (which builds for the host) can exercise
+    // the SwiftData-backed store, and for the future Mac client. iOS 17 / macOS 14
+    // are the SwiftData + Observation floor.
+    platforms: [.iOS(.v17), .macOS(.v14)],
     products: [
         .library(name: "ReaderCore", targets: ["ReaderCore"]),
     ],
