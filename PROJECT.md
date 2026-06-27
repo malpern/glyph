@@ -71,6 +71,21 @@ app/reader edge (the navigator bridge), never inside `ReaderCore`.
 Readium 3.10 no longer needs an HTTP server, so `ReadiumAdapterGCDWebServer` was
 dropped. `ReadiumOPDS` / `ReadiumLCP` are intentionally absent.
 
+## App icon
+
+The icon is authored as vector art at `Icon/AppIcon.svg` (an open book with a gold
+bookmark on a deep "library" gradient) — the source of truth. Re-render the 1024px
+master into the asset catalog with:
+
+```sh
+rsvg-convert -w 1024 -h 1024 Icon/AppIcon.svg \
+  -o App/Resources/Assets.xcassets/AppIcon.appiconset/icon-1024.png
+```
+
+A single 1024×1024 opaque icon is supplied; the system generates all sizes and
+applies the rounded mask. (A future enhancement is a layered Icon Composer `.icon`
+for the iOS 26+ Liquid Glass / tinted-icon treatments.)
+
 ## Build & run
 
 ```sh
