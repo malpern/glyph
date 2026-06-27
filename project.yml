@@ -1,0 +1,61 @@
+name: Reader
+options:
+  bundleIdPrefix: dev.malpern
+  deploymentTarget:
+    iOS: "17.0"
+  createIntermediateGroups: true
+  groupSortPosition: top
+
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    DEVELOPMENT_TEAM: ""
+    CODE_SIGN_STYLE: Automatic
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+
+packages:
+  ReaderCore:
+    path: Packages/ReaderCore
+  Readium:
+    url: https://github.com/readium/swift-toolkit
+    from: "3.10.0"
+
+targets:
+  Reader:
+    type: application
+    platform: iOS
+    sources:
+      - path: App
+      - path: Features
+    info:
+      path: App/Resources/Info.plist
+      properties:
+        CFBundleDisplayName: Reader
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: false
+        # Lets users import .epub files from Files/other apps.
+        UIFileSharingEnabled: true
+        LSSupportsOpeningDocumentsInPlace: true
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dev.malpern.Reader
+        # Readium's navigator and our WebView chrome require strict-concurrency
+        # to stay at "targeted" rather than "complete" for now; revisit per-file.
+        SWIFT_STRICT_CONCURRENCY: targeted
+        TARGETED_DEVICE_FAMILY: "1,2"
+    dependencies:
+      - package: ReaderCore
+      - package: Readium
+        product: ReadiumShared
+      - package: Readium
+        product: ReadiumStreamer
+      - package: Readium
+        product: ReadiumNavigator
+      - package: Readium
+        product: ReadiumAdapterGCDWebServer
