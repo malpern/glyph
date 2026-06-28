@@ -95,4 +95,68 @@ platform :ios do
       skip_waiting_for_build_processing: true
     )
   end
+
+  # Internal testing needs no Apple review. The group is created with access to all
+  # builds, so every upload (this one + future) appears automatically once processed.
+  # Internal testers must be team members (the account holder already is).
+  desc "Create an internal TestFlight group and add a tester (idempotent)"
+  lane :add_internal_tester do |options|
+    require 'spaceship'
+    require 'net/http'
+    require 'json'
+    Spaceship::ConnectAPI.token = Spaceship::ConnectAPI::Token.create(
+      key_id: ASC_KEY[:key_id], issuer_id: ASC_KEY[:issuer_id], filepath: ASC_KEY[:key_filepath]
+    )
+    email      = options[:email] || "malpern@gmail.com"
+    first      = options[:first] || "Micah"
+    last       = options[:last]  || "Alpern"
+    group_name = options[:group] || "Internal Testers"
+
+    app = Spaceship::ConnectAPI::App.find(APP_ID)
+    UI.user_error!("App #{APP_ID} not found") unless app
+
+    group = app.get_beta_groups.find { |g| g.name == group_name }
+    if group
+      group_id = group.id
+      UI.message("Group '#{group_name}' already exists (#{group_id}, internal=#{group.is_internal_group})")
+    else
+      # fastlane's create_beta_group helper is broken for internal groups (sends
+      # publicLinkLimitEnabled, which Apple rejects) — POST directly with valid attrs.
+      uri = URI("https://api.appstoreconnect.apple.com/v1/betaGroups")
+      req = Net::HTTP::Post.new(uri)
+      req["Authorization"] = "Bearer #{Spaceship::ConnectAPI.token.text}"
+      req["Content-Type"] = "application/json"
+      req.body = { data: {
+        type: "betaGroups",
+        attributes: { name: group_name, isInternalGroup: true, hasAccessToAllBuilds: true },
+        relationships: { app: { data: { type: "apps", id: app.id } } }
+      } }.to_json
+      res = Net::HTTP.start(uri.host, uri.port, use_ssl: true) { |h| h.request(req) }
+      UI.user_error!("Group create failed: #{res.code} #{res.body}") unless res.code.to_i.between?(200, 299)
+      group_id = JSON.parse(res.body)["data"]["id"]
+      UI.success("Created internal group '#{group_name}' (#{group_id})")
+    end
+
+    begin
+      Spaceship::ConnectAPI.post_beta_tester_assignment(
+        beta_group_ids: [group_id],
+        attributes: { email: email, firstName: first, lastName: last }
+      )
+      UI.success("Added #{email} to '#{group_name}'")
+    rescue => e
+      # Internal/team members already have a tester record — add it to the group directly.
+      tester = Spaceship::ConnectAPI::BetaTester.find(email: email) rescue nil
+      if tester
+        Spaceship::ConnectAPI.add_beta_tester_to_group(beta_group_id: group_id, beta_tester_ids: [tester.id])
+        UI.success("Added existing tester #{email} to '#{group_name}' (id #{tester.id})")
+      else
+        UI.important("No existing tester for #{email}; original error: #{e.message}")
+      end
+    end
+
+    app.get_builds(limit: 3).each do |b|
+      state = b.respond_to?(:processing_state) ? b.processing_state : "?"
+      UI.message("Build #{b.version} — #{state}")
+    end rescue nil
+  end
 end
