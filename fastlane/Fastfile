@@ -41,6 +41,28 @@ platform :ios do
     )
   end
 
+  # Registering the App ID (bundle identifier) on the developer portal IS scriptable
+  # with the API key (only the *app record* needs the web session). Registered as
+  # UNIVERSAL so a macOS build can share this identifier later.
+  desc "Register the App ID / bundle identifier via the ASC API key (idempotent)"
+  lane :register_app_id do
+    require 'spaceship'
+    Spaceship::ConnectAPI.token = Spaceship::ConnectAPI::Token.create(
+      key_id: ASC_KEY[:key_id],
+      issuer_id: ASC_KEY[:issuer_id],
+      filepath: ASC_KEY[:key_filepath]
+    )
+    existing = Spaceship::ConnectAPI::BundleId.all.find { |b| b.identifier == APP_ID }
+    if existing
+      UI.success("Bundle ID already registered: #{APP_ID} (#{existing.id})")
+    else
+      created = Spaceship::ConnectAPI::BundleId.create(
+        name: "Glyph", identifier: APP_ID, platform: "UNIVERSAL"
+      )
+      UI.success("Registered bundle ID #{APP_ID} (#{created.id})")
+    end
+  end
+
   desc "Regenerate the project, build a signed archive, and upload to TestFlight"
   lane :beta do
     api_key = app_store_connect_api_key(**ASC_KEY)
