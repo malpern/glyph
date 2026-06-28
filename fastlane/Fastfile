@@ -99,6 +99,25 @@ platform :ios do
   # Internal testing needs no Apple review. The group is created with access to all
   # builds, so every upload (this one + future) appears automatically once processed.
   # Internal testers must be team members (the account holder already is).
+  desc "Show TestFlight groups, their testers, and latest build states"
+  lane :tf_status do
+    require 'spaceship'
+    Spaceship::ConnectAPI.token = Spaceship::ConnectAPI::Token.create(
+      key_id: ASC_KEY[:key_id], issuer_id: ASC_KEY[:issuer_id], filepath: ASC_KEY[:key_filepath]
+    )
+    app = Spaceship::ConnectAPI::App.find(APP_ID)
+    app.get_beta_groups.each do |g|
+      UI.message("Group '#{g.name}'  internal=#{g.is_internal_group}  allBuilds=#{g.has_access_to_all_builds}  id=#{g.id}")
+      testers = Spaceship::ConnectAPI::BetaTester.all(filter: { "betaGroups" => g.id }) rescue []
+      if testers.empty?
+        UI.message("   (no testers)")
+      else
+        testers.each { |t| UI.message("   tester: #{t.email}  state=#{t.beta_tester_state}  installed=#{t.installed_cf_bundle_short_version_string || '—'}") }
+      end
+    end
+    app.get_builds(limit: 3).each { |b| UI.message("Build #{b.version} — #{b.processing_state}") }
+  end
+
   desc "Create an internal TestFlight group and add a tester (idempotent)"
   lane :add_internal_tester do |options|
     require 'spaceship'
