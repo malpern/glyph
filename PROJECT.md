@@ -73,21 +73,18 @@ dropped. `ReadiumOPDS` / `ReadiumLCP` are intentionally absent.
 
 ## App icon
 
-The icon is authored as vector art at `Icon/AppIcon.svg` (an open book with a gold
-bookmark on a deep "library" gradient) — the source of truth. Re-render the 1024px
-master into the asset catalog with:
-
-```sh
-rsvg-convert -w 1024 -h 1024 Icon/AppIcon.svg \
-  -o App/Resources/Assets.xcassets/AppIcon.appiconset/icon-1024.png
-```
+The icon is a bold **ampersand** — a typographic glyph, fitting the name — in a
+glossy, dimensional style on an indigo-to-coral gradient. Generated with OpenAI
+`gpt-image-1`; the 1024×1024 master lives at `Icon/glyph-icon-1024.png` and is
+mirrored into `App/Resources/Assets.xcassets/AppIcon.appiconset/icon-1024.png`.
+Rejected concepts are kept under `Icon/options/`.
 
 A single 1024×1024 opaque icon is supplied; the system generates all sizes and
 applies the rounded mask. (A future enhancement is a layered Icon Composer `.icon`
 for the iOS 26+ Liquid Glass / tinted-icon treatments.)
 
 The library empty-state uses the `BookArtwork` image asset — an open-book render
-generated with OpenAI `gpt-image-1` (source kept at `Icon/generated/openai-icon.png`).
+also generated with `gpt-image-1` (source at `Icon/generated/openai-icon.png`).
 
 ## Build & run
 
