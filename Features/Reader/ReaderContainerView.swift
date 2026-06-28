@@ -30,6 +30,17 @@ struct ReaderContainerView: View {
                         Button("Close", systemImage: "chevron.left") { close() }
                     }
                     ToolbarItem(placement: .topBarTrailing) {
+                        if let remote = viewModel.remoteSession {
+                            Button {
+                                remote.toggle()
+                            } label: {
+                                Image(systemName: "dot.radiowaves.left.and.right")
+                                    .foregroundStyle(remoteTint(remote.connectionState, active: remote.isActive))
+                            }
+                            .accessibilityLabel(remote.isActive ? "Stop X4 session" : "Connect X4")
+                        }
+                    }
+                    ToolbarItem(placement: .topBarTrailing) {
                         if let speech = viewModel.speech {
                             Button {
                                 Task { await viewModel.toggleSpeech() }
@@ -48,9 +59,9 @@ struct ReaderContainerView: View {
         .task {
             await viewModel.load()
             #if DEBUG
-            if ProcessInfo.processInfo.environment["READER_AUTOSPEAK"] == "1" {
-                await viewModel.toggleSpeech()
-            }
+            let env = ProcessInfo.processInfo.environment
+            if env["READER_AUTOREMOTE"] == "1" { viewModel.remoteSession?.start() }
+            if env["READER_AUTOSPEAK"] == "1" { await viewModel.toggleSpeech() }
             #endif
         }
     }
@@ -75,8 +86,19 @@ struct ReaderContainerView: View {
         }
     }
 
+    private func remoteTint(_ state: X4Client.ConnectionState, active: Bool) -> Color {
+        guard active else { return .secondary }
+        switch state {
+        case .connected: return .green
+        case .connecting: return .yellow
+        case .failed: return .red
+        case .disconnected: return .secondary
+        }
+    }
+
     private func close() {
         Task {
+            viewModel.stopAll()       // stop speech + disconnect X4
             await viewModel.flush()   // make resume exact before tearing down
             dismiss()
         }

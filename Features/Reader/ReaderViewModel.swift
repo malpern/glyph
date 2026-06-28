@@ -20,6 +20,8 @@ final class ReaderViewModel {
     private(set) var state: State = .loading
     /// Text-to-speech for this session, created once the publication opens.
     private(set) var speech: SpeechController?
+    /// X4 remote session (page-follow), wired to `speech`.
+    private(set) var remoteSession: RemoteSessionController?
 
     private let fileURL: URL
     private let readingState: any ReadingStateRepository
@@ -42,7 +44,9 @@ final class ReaderViewModel {
     func load() async {
         do {
             let publication = try await ReadiumStack.open(at: fileURL)
-            speech = SpeechController(content: SpineContentProvider(fileURL: fileURL))
+            let speechController = SpeechController(content: SpineContentProvider(fileURL: fileURL))
+            speech = speechController
+            remoteSession = RemoteSessionController(speech: speechController)
             state = .ready(publication, initialLocator: await restoredLocator())
         } catch {
             state = .failed(error.localizedDescription)
@@ -72,6 +76,12 @@ final class ReaderViewModel {
             guard !Task.isCancelled else { return }
             await self?.persist(locator)
         }
+    }
+
+    /// Stop read-aloud and disconnect the X4 — call when leaving the reader.
+    func stopAll() {
+        speech?.pause()
+        remoteSession?.stop()
     }
 
     /// Flush the latest position immediately — call before dismissing so resume is
