@@ -55,7 +55,11 @@ final class ReaderViewModel {
                 bookTitle: book.title
             )
             speech = speechController
-            remoteSession = RemoteSessionController(speech: speechController)
+            let session = RemoteSessionController(speech: speechController)
+            session.onRemotePosition = { [weak self] spine, para, bookID in
+                Task { await self?.adoptRemotePosition(spine: spine, para: para, bookID: bookID) }
+            }
+            remoteSession = session
             state = .ready(publication, initialLocator: initialLocator)
         } catch {
             state = .failed(error.localizedDescription)
@@ -103,6 +107,32 @@ final class ReaderViewModel {
     }
 
     // MARK: -
+
+    /// Bridge: the X4 reported a reading position — write it into the synced
+    /// `ReadingState` (last-writer-wins) so this phone's next open, and the user's
+    /// other Glyph devices, resume there. The reverse (correcting the X4 to a newer
+    /// cloud position on connect) lands once the firmware sends a freshness marker.
+    private func adoptRemotePosition(spine: Int, para: Int, bookID: String?) async {
+        if let bookID, bookID != book.id { return }   // different book — ignore
+        guard let locator = await locator(forSpine: spine, paragraph: para),
+              let data = LocatorCoding.data(from: locator) else { return }
+        try? await readingState.updateLocator(bookID: book.id, locator: data)
+        await syncEngine?.pushDirty()
+    }
+
+    /// Approximate a Readium `Locator` for a `(spine, <p> ordinal)` position: the
+    /// spine item's URL plus a progression from the paragraph's place in the chapter.
+    private func locator(forSpine spine: Int, paragraph para: Int) async -> Locator? {
+        guard let publication, publication.readingOrder.indices.contains(spine) else { return nil }
+        let link = publication.readingOrder[spine]
+        let count = (try? await ReadiumStack.paragraphs(at: fileURL, spineIndex: spine).count) ?? 0
+        let progression = count > 1 ? Double(max(0, para - 1)) / Double(count) : 0.0
+        return Locator(
+            href: link.url(),
+            mediaType: link.mediaType ?? .html,
+            locations: .init(progression: progression)
+        )
+    }
 
     /// The spine (reading-order) index a locator points into, by normalized-URL match.
     private func spineIndex(for locator: Locator) -> Int? {

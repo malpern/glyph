@@ -18,6 +18,11 @@ final class RemoteSessionController {
     let client = X4Client()
     private(set) var isActive = false
 
+    /// Fired when the X4 reports its reading position (on connect via `ready`, or on a
+    /// manual `pos` change). The reader bridges this into the cloud sync. The `bookID`
+    /// (when present) lets the consumer verify both sides are on the same EPUB.
+    var onRemotePosition: ((_ spine: Int, _ para: Int, _ bookID: String?) -> Void)?
+
     private weak var speech: SpeechController?
     private var lastSpine = -1
     private var lastPara = -1
@@ -77,12 +82,18 @@ final class RemoteSessionController {
 
     private func handle(_ event: RemoteEvent) {
         switch event {
-        case .ready:
+        case let .ready(spine, para, bookID):
             reconnectAttempt = 0   // healthy connection
-            // On (re)connect, re-announce where we are so the device re-syncs.
-            if lastPara >= 0 {
+            if let para {
+                // The X4 reported its position — bridge it into the cloud sync.
+                onRemotePosition?(spine ?? lastSpine, para, bookID)
+            } else if lastPara >= 0 {
+                // Older firmware (no position) — re-announce ours so it re-syncs.
                 client.send(.highlight(spine: lastSpine, para: lastPara, sentence: lastSent, text: nil))
             }
+        case let .position(spine, para):
+            // The user navigated on the X4.
+            if let para { onRemotePosition?(spine ?? lastSpine, para, nil) }
         case let .highlightAck(spine, para, _, ok):
             // Sentence wasn't on the resolved page — fall back to page-follow.
             if ok == false, let para {

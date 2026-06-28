@@ -19,7 +19,9 @@ PORT = int(sys.argv[1]) if len(sys.argv) > 1 else 8181
 
 async def handle(ws):
     print("CONNECT", flush=True)
-    await ws.send(json.dumps({"evt": "ready"}))
+    # Report a current device position on connect (spine 3, paragraph 2) so the phone
+    # can bridge it into the cloud sync.
+    await ws.send(json.dumps({"evt": "ready", "spine": 3, "para": 2}))
     async for raw in ws:
         print(f"RECV {raw}", flush=True)
         try:

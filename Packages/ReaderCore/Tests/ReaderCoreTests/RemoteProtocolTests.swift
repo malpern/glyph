@@ -32,14 +32,22 @@ import Foundation
     // MARK: Events (X4 -> phone)
 
     @Test func decodesLiveEvents() {
-        #expect(RemoteEvent.decode(#"{"evt":"ready"}"#) == .ready(spine: nil, page: nil))
+        #expect(RemoteEvent.decode(#"{"evt":"ready"}"#) == .ready(spine: nil, para: nil, bookID: nil))
         #expect(RemoteEvent.decode(#"{"evt":"pong"}"#) == .pong)
         #expect(RemoteEvent.decode(#"{"evt":"goto","spine":4,"para":12,"ok":true}"#)
             == .gotoAck(spine: 4, para: 12, ok: true))
     }
 
-    @Test func decodesPlannedReadyWithPositionAndButton() {
-        #expect(RemoteEvent.decode(#"{"evt":"ready","spine":4,"page":37}"#) == .ready(spine: 4, page: 37))
+    @Test func decodesReadyWithPositionAndBookId() {
+        #expect(RemoteEvent.decode(#"{"evt":"ready","spine":4,"para":12,"bookId":"urn:x"}"#)
+            == .ready(spine: 4, para: 12, bookID: "urn:x"))
+        // back-compat: an older firmware sending "page" maps to para
+        #expect(RemoteEvent.decode(#"{"evt":"ready","spine":4,"page":37}"#)
+            == .ready(spine: 4, para: 37, bookID: nil))
+    }
+
+    @Test func decodesPositionAndButton() {
+        #expect(RemoteEvent.decode(#"{"evt":"pos","spine":4,"para":12}"#) == .position(spine: 4, para: 12))
         #expect(RemoteEvent.decode(#"{"evt":"button","action":"play"}"#) == .button(action: "play"))
     }
 

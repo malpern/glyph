@@ -7,8 +7,12 @@ import Foundation
 /// That lets the firmware add fields and events (e.g. the planned `button` events)
 /// without breaking older clients.
 public enum RemoteEvent: Sendable, Equatable {
-    /// `{"evt":"ready"}` on connect; optionally extended with device position. [LIVE / PLANNED extension]
-    case ready(spine: Int?, page: Int?)
+    /// `{"evt":"ready","spine":S,"para":P,"bookId":"…"}` on connect — optionally
+    /// carrying the device's current position + loaded book, for resume reconciliation.
+    case ready(spine: Int?, para: Int?, bookID: String?)
+    /// `{"evt":"pos","spine":S,"para":P}` — the user navigated **on the X4**; lets the
+    /// phone mirror live X4 reading into the cloud. [PLANNED]
+    case position(spine: Int?, para: Int?)
     /// `{"evt":"pong"}`. [LIVE]
     case pong
     /// `{"evt":"goto",…,"ok":true}` — ack of a `goto`. [LIVE]
@@ -30,7 +34,8 @@ public enum RemoteEvent: Sendable, Equatable {
         func bool(_ key: String) -> Bool? { (object[key] as? NSNumber)?.boolValue }
 
         switch evt {
-        case "ready": return .ready(spine: int("spine"), page: int("page"))
+        case "ready": return .ready(spine: int("spine"), para: int("para") ?? int("page"), bookID: object["bookId"] as? String)
+        case "pos": return .position(spine: int("spine"), para: int("para"))
         case "pong": return .pong
         case "goto": return .gotoAck(spine: int("spine"), para: int("para"), ok: bool("ok"))
         case "hl": return .highlightAck(spine: int("spine"), para: int("para"), sentence: int("sent"), ok: bool("ok"))

@@ -187,9 +187,16 @@ Also built (phone side, hardware-independent):
 paragraph and highlights the sentence), falling back to `goto{spine,para}` if the
 device acks `ok:false`. Verified vs the mock (incl. the fallback).
 
+**Position bridge (phone side) built:** when the X4 reports its position
+(`ready{spine,para,bookId}` / `pos{spine,para}`), Glyph converts it to a Readium
+`Locator` and writes it to the synced reading state — so the phone (and the user's
+other Glyph apps) resume where the X4 left off. Verified vs the mock: `ready{spine:3,
+para:2}` → cloud locator at spine 3, progression (2−1)/24. The X4 joins the
+last-writer-wins sync whenever the phone is connected (the phone is its cloud bridge).
+
 ### Still ahead (X4)
-- **Real-device run** — verify highlight/page-follow against the physical X4.
-- **X4 → phone resume** — adopt the device's position on connect (needs the firmware's `ready{spine,para}`).
+- **Real-device run** — verify highlight/page-follow + the position bridge against the physical X4.
+- **Reverse direction** — correct the X4 to a *newer* cloud position on connect (needs the firmware's `ready{spine,para}` + a freshness marker to order conflicts).
 - **Phase 4 device buttons** — inbound `button` events already route into the playback controller; live when the firmware sends them.
 
 See `/Users/malpern/.claude/plans/dreamy-beaming-sphinx.md` for the full plan.
