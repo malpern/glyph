@@ -42,6 +42,10 @@ swift test --package-path Packages/ReaderCore
 ```
 
 `GoogleService-Info.plist` is committed (Firebase client config is app-embedded,
-not a secret); data is protected by Firestore rules (`request.auth.uid`). Auth uses
-a sync key the app turns into a real Firebase login — see PROJECT.md. DEBUG-only
-launch hooks (`READER_*`) exist for headless simulator testing and never ship.
+not a secret); data is protected by Firestore rules (`request.auth.uid`), and the
+public API key is restricted to this app's bundle id and the Firebase APIs it uses,
+so it can't be reused elsewhere. Auth uses a sync key the app turns into a real
+Firebase login — see PROJECT.md. DEBUG-only launch hooks (`READER_*`) exist for
+headless simulator testing and never ship.
+
+Licensed under the [MIT License](LICENSE).
