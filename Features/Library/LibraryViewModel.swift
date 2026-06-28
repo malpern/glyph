@@ -46,9 +46,10 @@ final class LibraryViewModel {
         guard let documents = try? fileManager.url(
             for: .documentDirectory, in: .userDomainMask, appropriateFor: nil, create: false
         ) else { return }
-        let epubs = ((try? fileManager.contentsOfDirectory(
+        let contents = (try? fileManager.contentsOfDirectory(
             at: documents, includingPropertiesForKeys: nil
-        )) ?? []).filter { $0.pathExtension.lowercased() == "epub" }
+        )) ?? []
+        let epubs = InboxScanner.epubsToIngest(in: contents)
         guard !epubs.isEmpty else { return }
 
         isImporting = true
