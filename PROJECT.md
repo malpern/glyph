@@ -1,6 +1,6 @@
-# Reader — Architecture & Rationale
+# Glyph — Architecture & Rationale
 
-A cross-device EPUB reader. This repo is the **iPhone client** — the first of an
+**Glyph** is a cross-device EPUB reader. This repo is the **iPhone client** — the first of an
 intended ecosystem (iPhone → iPad → Mac → a non-Apple X4/Crosspoint e-ink reader).
 The long-term value is **cloud-synchronized reading state**; Phase 1 is the smallest
 high-quality *local* reader that the sync layer can grow into without a rewrite.
@@ -93,9 +93,9 @@ generated with OpenAI `gpt-image-1` (source kept at `Icon/generated/openai-icon.
 
 ```sh
 brew install xcodegen          # one-time
-xcodegen generate              # regenerate Reader.xcodeproj from project.yml
-open Reader.xcodeproj
-# or: xcodebuild -project Reader.xcodeproj -scheme Reader \
+xcodegen generate              # regenerate Glyph.xcodeproj from project.yml
+open Glyph.xcodeproj
+# or: xcodebuild -project Glyph.xcodeproj -scheme Glyph \
 #       -destination 'platform=iOS Simulator,name=iPhone 17' build
 swift test --package-path Packages/ReaderCore   # Core unit tests
 ```

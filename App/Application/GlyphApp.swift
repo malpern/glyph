@@ -2,7 +2,7 @@ import SwiftUI
 import FirebaseCore
 
 @main
-struct ReaderApp: App {
+struct GlyphApp: App {
     /// Built once and injected into the environment for the whole app.
     @State private var container: AppContainer
     @Environment(\.scenePhase) private var scenePhase
