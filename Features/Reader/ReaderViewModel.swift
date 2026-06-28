@@ -50,7 +50,10 @@ final class ReaderViewModel {
             self.publication = publication
             let initialLocator = await restoredLocator()
             if let initialLocator { currentSpineIndex = spineIndex(for: initialLocator) ?? 0 }
-            let speechController = SpeechController(content: SpineContentProvider(fileURL: fileURL))
+            let speechController = SpeechController(
+                content: SpineContentProvider(fileURL: fileURL),
+                bookTitle: book.title
+            )
             speech = speechController
             remoteSession = RemoteSessionController(speech: speechController)
             state = .ready(publication, initialLocator: initialLocator)
@@ -86,7 +89,7 @@ final class ReaderViewModel {
 
     /// Stop read-aloud and disconnect the X4 — call when leaving the reader.
     func stopAll() {
-        speech?.pause()
+        speech?.tearDown()
         remoteSession?.stop()
     }
 

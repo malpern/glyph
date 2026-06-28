@@ -31,16 +31,35 @@ final class SpeechController: NSObject, AVSpeechSynthesizerDelegate {
 
     private let content: SpineContentProvider
     private let synthesizer = AVSpeechSynthesizer()
+    private let nowPlaying: NowPlayingController
     private var units: [Unit] = []
     private var index = 0
     private var spineCount = 0
     private var generation = 0                       // guards stale utterance callbacks
     private var generationByUtterance: [ObjectIdentifier: Int] = [:]
 
-    init(content: SpineContentProvider) {
+    init(content: SpineContentProvider, bookTitle: String) {
         self.content = content
+        self.nowPlaying = NowPlayingController(bookTitle: bookTitle)
         super.init()
         synthesizer.delegate = self
+        // Lock screen / AirPods / Control Center → the same playback surface.
+        nowPlaying.onPlay = { [weak self] in self?.play() }
+        nowPlaying.onPause = { [weak self] in self?.pause() }
+        nowPlaying.onTogglePlayPause = { [weak self] in self?.togglePlayPause() }
+        nowPlaying.onNext = { [weak self] in self?.nextSentence() }
+        nowPlaying.onPrevious = { [weak self] in self?.previousSentence() }
+    }
+
+    /// Stop speaking and remove the Now Playing entry / remote handlers.
+    func tearDown() {
+        pause()
+        nowPlaying.clear()
+    }
+
+    private func updateNowPlaying() {
+        let sentence = units.indices.contains(index) ? units[index].text : ""
+        nowPlaying.update(isPlaying: isPlaying, sentence: sentence)
     }
 
     // MARK: Playback surface (UI + remote both call these)
@@ -66,11 +85,13 @@ final class SpeechController: NSObject, AVSpeechSynthesizerDelegate {
         } else if !synthesizer.isSpeaking {
             speakCurrent()
         }
+        updateNowPlaying()
     }
 
     func pause() {
         isPlaying = false
         if synthesizer.isSpeaking { synthesizer.pauseSpeaking(at: .word) }
+        updateNowPlaying()
     }
 
     func togglePlayPause() { isPlaying ? pause() : play() }
@@ -106,6 +127,7 @@ final class SpeechController: NSObject, AVSpeechSynthesizerDelegate {
         paragraphOrdinal = unit.paragraph
         sentenceIndex = unit.sentence
         onPositionChange?(spineIndex, unit.paragraph, unit.sentence, changed)
+        updateNowPlaying()
 
         #if DEBUG
         print("🔊 TTS spine=\(spineIndex) para=\(unit.paragraph) sent=\(unit.sentence): \(unit.text.prefix(48))")
