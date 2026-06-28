@@ -68,14 +68,27 @@ platform :ios do
     api_key = app_store_connect_api_key(**ASC_KEY)
     sh("cd .. && /opt/homebrew/bin/xcodegen generate")
     build_number = Time.now.strftime("%Y%m%d%H%M")
+    # gym/build_app doesn't take the API key directly in this version; pass it to
+    # xcodebuild as authentication-key flags so -allowProvisioningUpdates can sign
+    # (auto-creating the App Store distribution profile) on both archive and export.
+    auth = "-allowProvisioningUpdates " \
+           "-authenticationKeyPath #{ASC_KEY[:key_filepath]} " \
+           "-authenticationKeyID #{ASC_KEY[:key_id]} " \
+           "-authenticationKeyIssuerID #{ASC_KEY[:issuer_id]}"
     build_app(
       project: PROJECT,
       scheme: SCHEME,
       configuration: "Release",
       export_method: "app-store",
       output_directory: "build/ipa",
-      api_key: api_key,
-      xcargs: "-allowProvisioningUpdates DEVELOPMENT_TEAM=#{TEAM_ID} CURRENT_PROJECT_VERSION=#{build_number}"
+      export_team_id: TEAM_ID,
+      # SWIFT_OPTIMIZATION_LEVEL=-Onone works around a Swift optimizer crash compiling
+      # SwiftSoup (a Readium dep) in Release on the current toolchain. Fine for TestFlight;
+      # revisit (per-package opt, or a toolchain bump) when chasing release perf.
+      # gym auto-injects the API-key auth flags for the *export* step from the
+      # app_store_connect_api_key context, so we only pass them for the archive here.
+      xcargs: "#{auth} DEVELOPMENT_TEAM=#{TEAM_ID} CURRENT_PROJECT_VERSION=#{build_number} " \
+              "SWIFT_OPTIMIZATION_LEVEL=-Onone"
     )
     upload_to_testflight(
       api_key: api_key,
