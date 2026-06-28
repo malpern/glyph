@@ -1,0 +1,3 @@
+app_identifier("dev.malpern.Glyph")
+team_id("X2RKZ5TG99")            # Apple Developer team
+# Auth is via the App Store Connect API key (see Fastfile) — no Apple ID / 2FA needed.

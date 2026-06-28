@@ -1,0 +1,63 @@
+# Glyph deployment lanes. Auth is the App Store Connect API key (no Apple ID / 2FA).
+#
+#   fastlane setup   # create/ensure the App Store Connect app record (one-time)
+#   fastlane beta    # regenerate project, build a signed archive, upload to TestFlight
+#
+# Credentials are documented in ~/.config/agent/ACCESS.md (Apple section).
+
+default_platform(:ios)
+
+ASC_KEY = {
+  key_id: "XQ4565NYZ7",
+  issuer_id: "60b8eb46-ca64-4580-a43b-850d92fcc7ab",
+  key_filepath: File.expand_path("~/.appstoreconnect/private_keys/AuthKey_XQ4565NYZ7.p8"),
+}
+
+TEAM_ID      = "X2RKZ5TG99"
+APP_ID       = "dev.malpern.Glyph"
+APP_NAME     = "Glyph Reader"
+SCHEME       = "Glyph"
+PROJECT      = "Glyph.xcodeproj"
+
+platform :ios do
+  before_all do
+    ENV["FASTLANE_SKIP_UPDATE_CHECK"] = "1"
+    ENV["FASTLANE_HIDE_CHANGELOG"] = "1"
+  end
+
+  # App *creation* is the one step Apple does not expose via the API key — it needs
+  # an authenticated web session (Apple ID + 2FA). Run `fastlane spaceauth -u <apple-id>`
+  # once to mint a ~30-day FASTLANE_SESSION, then this lane works non-interactively.
+  # (Or just create the app once in the App Store Connect web UI.)
+  desc "Create / ensure the App Store Connect app record (idempotent; needs a Spaceship session)"
+  lane :setup do
+    produce(
+      username: "malpern@gmail.com",
+      app_identifier: APP_ID,
+      app_name: APP_NAME,
+      language: "English",
+      sku: "glyph-reader",
+      team_id: TEAM_ID
+    )
+  end
+
+  desc "Regenerate the project, build a signed archive, and upload to TestFlight"
+  lane :beta do
+    api_key = app_store_connect_api_key(**ASC_KEY)
+    sh("cd .. && /opt/homebrew/bin/xcodegen generate")
+    build_number = Time.now.strftime("%Y%m%d%H%M")
+    build_app(
+      project: PROJECT,
+      scheme: SCHEME,
+      configuration: "Release",
+      export_method: "app-store",
+      output_directory: "build/ipa",
+      api_key: api_key,
+      xcargs: "-allowProvisioningUpdates DEVELOPMENT_TEAM=#{TEAM_ID} CURRENT_PROJECT_VERSION=#{build_number}"
+    )
+    upload_to_testflight(
+      api_key: api_key,
+      skip_waiting_for_build_processing: true
+    )
+  end
+end

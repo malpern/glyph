@@ -48,6 +48,8 @@ targets:
         # Keep read-aloud playing to AirPods when the screen locks / app backgrounds.
         UIBackgroundModes:
           - audio
+        # Only standard encryption (HTTPS/Firebase) — exempt; skips the TestFlight prompt.
+        ITSAppUsesNonExemptEncryption: false
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: dev.malpern.Glyph

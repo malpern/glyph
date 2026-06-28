@@ -15,3 +15,8 @@ Package.resolved
 
 # macOS
 .DS_Store
+
+# fastlane
+fastlane/report.xml
+fastlane/README.md
+fastlane/test_output/
