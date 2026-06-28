@@ -17,6 +17,8 @@ final class AppContainer {
     let storage: BookStorage
     /// Reconciles local reading positions with the cloud. Started in `startSync()`.
     let syncEngine: ReadingStateSyncEngine
+    /// App-wide reading appearance (theme/font/size/spacing).
+    let readerSettings = ReaderSettingsStore()
 
     /// Key-based identity: the app derives a real Firebase login from a sync key
     /// the user moves between devices. Exposed so the sync settings UI can show /

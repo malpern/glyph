@@ -9,6 +9,8 @@ import ReadiumShared
 struct EPUBReaderView: UIViewControllerRepresentable {
     let publication: Publication
     let initialLocator: Locator?
+    /// Appearance (theme/font/size/spacing); applied live as it changes.
+    let preferences: EPUBPreferences
     /// Forwarded from the navigator on every position change (a `Locator`).
     let onLocationChange: (Locator) -> Void
     /// A center tap that the navigator didn't consume — used to toggle chrome.
@@ -23,9 +25,10 @@ struct EPUBReaderView: UIViewControllerRepresentable {
             let navigator = try EPUBNavigatorViewController(
                 publication: publication,
                 initialLocation: initialLocator,
-                config: .init()
+                config: .init(preferences: preferences)
             )
             navigator.delegate = context.coordinator
+            context.coordinator.lastPreferences = preferences
             autoAdvanceIfRequested(navigator)
             return navigator
         } catch {
@@ -34,8 +37,11 @@ struct EPUBReaderView: UIViewControllerRepresentable {
     }
 
     func updateUIViewController(_ uiViewController: UIViewController, context: Context) {
-        // Position is driven through the initializer and the navigator's own
-        // gestures; no SwiftUI-driven updates needed in Phase 1.
+        // Apply appearance changes live when settings change.
+        guard let navigator = uiViewController as? EPUBNavigatorViewController,
+              context.coordinator.lastPreferences != preferences else { return }
+        context.coordinator.lastPreferences = preferences
+        navigator.submitPreferences(preferences)
     }
 
     /// DEBUG-only: turn N pages after load so headless simulator runs can exercise
@@ -57,6 +63,7 @@ struct EPUBReaderView: UIViewControllerRepresentable {
     final class Coordinator: NSObject, EPUBNavigatorDelegate {
         private let onLocationChange: (Locator) -> Void
         private let onTap: () -> Void
+        var lastPreferences: EPUBPreferences?
 
         init(onLocationChange: @escaping (Locator) -> Void, onTap: @escaping () -> Void) {
             self.onLocationChange = onLocationChange

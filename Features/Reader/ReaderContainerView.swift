@@ -7,7 +7,9 @@ import ReaderCore
 struct ReaderContainerView: View {
     @State private var viewModel: ReaderViewModel
     @Environment(\.dismiss) private var dismiss
+    @Environment(AppContainer.self) private var container
     @State private var showChrome = true
+    @State private var showingSettings = false
 
     init(
         book: Book,
@@ -28,6 +30,12 @@ struct ReaderContainerView: View {
                 .toolbar {
                     ToolbarItem(placement: .topBarLeading) {
                         Button("Close", systemImage: "chevron.left") { close() }
+                    }
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button { showingSettings = true } label: {
+                            Image(systemName: "textformat.size")
+                        }
+                        .accessibilityLabel("Reading settings")
                     }
                     ToolbarItem(placement: .topBarTrailing) {
                         if let remote = viewModel.remoteSession {
@@ -55,6 +63,9 @@ struct ReaderContainerView: View {
                 // reading; tapping the page toggles it.
                 .toolbarVisibility(showChrome ? .visible : .hidden, for: .navigationBar)
                 .statusBarHidden(!showChrome)
+                .sheet(isPresented: $showingSettings) {
+                    ReaderSettingsView(store: container.readerSettings)
+                }
         }
         .task {
             await viewModel.load()
@@ -79,6 +90,7 @@ struct ReaderContainerView: View {
             EPUBReaderView(
                 publication: publication,
                 initialLocator: initialLocator,
+                preferences: container.readerSettings.epubPreferences,
                 onLocationChange: { viewModel.locationChanged($0) },
                 onTap: { withAnimation(.easeInOut(duration: 0.2)) { showChrome.toggle() } }
             )
