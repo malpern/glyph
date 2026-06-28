@@ -15,7 +15,7 @@ ASC_KEY = {
 
 TEAM_ID      = "X2RKZ5TG99"
 APP_ID       = "dev.malpern.Glyph"
-APP_NAME     = "Glyph Reader"
+APP_NAME     = "Glyph: Read & Listen"
 SCHEME       = "Glyph"
 PROJECT      = "Glyph.xcodeproj"
 
