@@ -33,6 +33,14 @@ async def handle(ws):
             await ws.send(json.dumps({
                 "evt": "goto", "spine": msg.get("spine"), "para": msg.get("para"), "ok": True
             }))
+        elif cmd == "highlight":
+            # Ack ok:true, but pretend para 3 isn't on the resolved page to exercise
+            # the phone's goto fallback.
+            ok = msg.get("para") != 3
+            await ws.send(json.dumps({
+                "evt": "hl", "spine": msg.get("spine"), "para": msg.get("para"),
+                "sent": msg.get("sent"), "ok": ok
+            }))
 
 
 async def main():

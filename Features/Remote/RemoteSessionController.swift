@@ -3,13 +3,15 @@ import Observation
 import ReaderCore
 
 /// Orchestrates a remote session with the X4: connects the WebSocket, drives
-/// **page-follow** (sends `goto{spine,para}` as TTS crosses into each new
-/// paragraph), and routes inbound events back into playback.
+/// **per-sentence highlight** (sends `highlight{spine,para,sent}` as TTS speaks
+/// each sentence — the device navigates to the paragraph *and* highlights the
+/// sentence), and routes inbound events back into playback.
 ///
-/// This is where the live `goto` path lives. Per the protocol's forward-compat
-/// design, inbound `button` events are routed into the *same* `SpeechController`
-/// the on-screen controls use, so the X4's physical buttons (Phase 4) will work
-/// with no further wiring once the firmware sends them.
+/// `highlight` is the live drive path now that the firmware supports it; if the
+/// device acks `ok:false` (the sentence wasn't on the resolved page), we fall back
+/// to `goto{spine,para}` so the page still follows. Inbound `button` events route
+/// into the *same* `SpeechController` the on-screen controls use, so the X4's
+/// physical buttons (Phase 4) work with no further wiring once the firmware sends them.
 @MainActor
 @Observable
 final class RemoteSessionController {
@@ -19,6 +21,7 @@ final class RemoteSessionController {
     private weak var speech: SpeechController?
     private var lastSpine = -1
     private var lastPara = -1
+    private var lastSent = 0
     private var reconnectTask: Task<Void, Never>?
     private var reconnectAttempt = 0
 
@@ -26,10 +29,9 @@ final class RemoteSessionController {
         self.speech = speech
         client.onEvent = { [weak self] event in self?.handle(event) }
         client.onDisconnect = { [weak self] in self?.scheduleReconnect() }
-        // TTS paragraph crossings drive the X4's page turns.
-        speech.onPositionChange = { [weak self] spine, para, _, paragraphChanged in
-            guard paragraphChanged else { return }
-            self?.sendGoto(spine: spine, para: para)
+        // Every spoken sentence drives a precise highlight on the X4.
+        speech.onPositionChange = { [weak self] spine, para, sent, _ in
+            self?.sendHighlight(spine: spine, para: para, sent: sent)
         }
     }
 
@@ -65,11 +67,12 @@ final class RemoteSessionController {
 
     // MARK: -
 
-    private func sendGoto(spine: Int, para: Int) {
+    private func sendHighlight(spine: Int, para: Int, sent: Int) {
         guard isActive else { return }
         lastSpine = spine
         lastPara = para
-        client.send(.goto(spine: spine, para: para))
+        lastSent = sent
+        client.send(.highlight(spine: spine, para: para, sentence: sent, text: nil))
     }
 
     private func handle(_ event: RemoteEvent) {
@@ -77,11 +80,18 @@ final class RemoteSessionController {
         case .ready:
             reconnectAttempt = 0   // healthy connection
             // On (re)connect, re-announce where we are so the device re-syncs.
-            if lastPara >= 0 { client.send(.goto(spine: lastSpine, para: lastPara)) }
+            if lastPara >= 0 {
+                client.send(.highlight(spine: lastSpine, para: lastPara, sentence: lastSent, text: nil))
+            }
+        case let .highlightAck(spine, para, _, ok):
+            // Sentence wasn't on the resolved page — fall back to page-follow.
+            if ok == false, let para {
+                client.send(.goto(spine: spine ?? lastSpine, para: para))
+            }
         case let .button(action):
             route(button: action)
         default:
-            break   // pong / acks / unknown — nothing to do for page-follow
+            break   // pong / goto ack / unknown — nothing to do
         }
     }
 

@@ -165,7 +165,7 @@ always phone → AirPods; the X4 is a synchronized display + (later) remote.
 | Addressing | `<p>` start-tag scan over RAW spine bytes → 1-based ordinals matching the X4's expat count; simple-punctuation sentences | `ReaderCore/Reading` (tested) |
 | Protocol | discriminated, forward-compatible `RemoteCommand`/`RemoteEvent` codec (`ping`/`goto` live) | `ReaderCore/Remote` (tested) |
 | TTS | `SpeechController` — AVSpeechSynthesizer → AirPods, driven by the paragraph model, tracks `(spine,para,sentence)` | `Features/Reader` |
-| Link | `X4Client` (WebSocket `ws://crosspoint.local:81`) + `RemoteSessionController` (page-follow) | `Features/Remote` |
+| Link | `X4Client` (WebSocket `ws://crosspoint.local:81`) + `RemoteSessionController` (per-sentence `highlight`, `goto` fallback) | `Features/Remote` |
 
 **Verified (phone side, vs `Tools/mock_x4.py`):** app connects, and as TTS speaks each
 paragraph it sends `{"cmd":"goto","para":N,"spine":S}` in order. The addressing contract
@@ -182,9 +182,14 @@ Also built (phone side, hardware-independent):
   drive play/pause/skip into the same `SpeechController` (the native sibling of the X4 buttons).
 - **Auto-reconnect** — the X4 link retries with backoff and re-announces position on reconnect (verified vs the mock).
 
+**Per-sentence highlight is now LIVE** (firmware shipped it): the phone sends
+`highlight{spine,para,sent}` as TTS speaks each sentence (the device navigates to the
+paragraph and highlights the sentence), falling back to `goto{spine,para}` if the
+device acks `ok:false`. Verified vs the mock (incl. the fallback).
+
 ### Still ahead (X4)
-- **Real-device run** — verify page-follow against the physical X4 (needs the hardware).
-- **Per-sentence highlight** (`highlight{spine,para,sent}`) once the firmware retains paragraph index per line.
+- **Real-device run** — verify highlight/page-follow against the physical X4.
+- **X4 → phone resume** — adopt the device's position on connect (needs the firmware's `ready{spine,para}`).
 - **Phase 4 device buttons** — inbound `button` events already route into the playback controller; live when the firmware sends them.
 
 See `/Users/malpern/.claude/plans/dreamy-beaming-sphinx.md` for the full plan.
