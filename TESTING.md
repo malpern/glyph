@@ -22,6 +22,11 @@ make test          # swift test on ReaderCore — sub-second, no simulator
 make test-watch    # re-run on change (needs: brew install watchexec)
 ```
 
+> **Run via `make test`, not bare `swift test`.** The SwiftData-backed suites
+> create in-memory stores that aren't safe to spin up concurrently, so Swift
+> Testing's default cross-suite parallelism occasionally SIGSEGVs them. `make test`
+> (and CI) pass `--no-parallel`; the suite is sub-second, so it costs nothing.
+
 ReaderCore has **no third-party dependencies**, so this build never fetches
 Readium or Firebase. That's deliberate and worth protecting — it's why the loop is
 fast. Current coverage: `SwiftDataStore` persistence, `ReadingStateSyncEngine`

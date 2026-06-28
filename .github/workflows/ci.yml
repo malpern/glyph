@@ -26,4 +26,7 @@ jobs:
         run: swift --version
 
       - name: Run ReaderCore tests
-        run: swift test --package-path Packages/ReaderCore
+        # --no-parallel: the SwiftData-backed suites aren't safe to run concurrently
+        # (Swift Testing's default parallelism races their in-memory stores into an
+        # occasional SIGSEGV). Sub-second suite, so serializing is free.
+        run: swift test --package-path Packages/ReaderCore --no-parallel

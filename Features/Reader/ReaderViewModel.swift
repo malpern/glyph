@@ -113,7 +113,8 @@ final class ReaderViewModel {
     /// other Glyph devices, resume there. The reverse (correcting the X4 to a newer
     /// cloud position on connect) lands once the firmware sends a freshness marker.
     private func adoptRemotePosition(spine: Int, para: Int, bookID: String?) async {
-        if let bookID, bookID != book.id { return }   // different book — ignore
+        guard RemotePositionMapping.appliesToOpenBook(incomingBookID: bookID, currentBookID: book.id)
+        else { return }   // stale report for a different book — ignore
         guard let locator = await locator(forSpine: spine, paragraph: para),
               let data = LocatorCoding.data(from: locator) else { return }
         try? await readingState.updateLocator(bookID: book.id, locator: data)
@@ -126,7 +127,7 @@ final class ReaderViewModel {
         guard let publication, publication.readingOrder.indices.contains(spine) else { return nil }
         let link = publication.readingOrder[spine]
         let count = (try? await ReadiumStack.paragraphs(at: fileURL, spineIndex: spine).count) ?? 0
-        let progression = count > 1 ? Double(max(0, para - 1)) / Double(count) : 0.0
+        let progression = RemotePositionMapping.progression(paragraphOrdinal: para, paragraphCount: count)
         return Locator(
             href: link.url(),
             mediaType: link.mediaType ?? .html,
