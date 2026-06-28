@@ -1,17 +1,12 @@
 rules_version = '2';
 
-// Phase 2a (stub-user) rules.
-//
-// The app currently identifies with a shared StubAuth id and sends NO Firebase
-// Auth token, so these rules grant access to that one throwaway dev subtree only —
-// everything else is denied. There is no real user data here yet.
-//
-// P2.5 replaces this with proper auth:
-//   allow read, write: if request.auth != null && request.auth.uid == userID;
+// Real auth (P2.5): a signed-in user may read/write only their own subtree.
+// The app authenticates with Firebase Email/Password credentials derived from the
+// user's sync key, so `request.auth.uid` is the account the key maps to.
 service cloud.firestore {
   match /databases/{database}/documents {
     match /users/{userID}/{document=**} {
-      allow read, write: if userID == "dev-shared-user";
+      allow read, write: if request.auth != null && request.auth.uid == userID;
     }
   }
 }

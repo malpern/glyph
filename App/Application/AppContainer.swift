@@ -18,9 +18,10 @@ final class AppContainer {
     /// Reconciles local reading positions with the cloud. Started in `startSync()`.
     let syncEngine: ReadingStateSyncEngine
 
-    /// Stub identity for the first cut — a shared dev user so two devices sync to
-    /// one account without real auth. Replaced by Firebase email-link in P2.5.
-    private let auth: any AuthProviding = StubAuth()
+    /// Key-based identity: the app derives a real Firebase login from a sync key
+    /// the user moves between devices. Exposed so the sync settings UI can show /
+    /// replace the key.
+    let keyAuth = FirebaseKeyAuth(keyStore: KeychainKeyStore())
 
     /// Features depend on the protocols, not the concrete `SwiftDataStore`.
     var library: any LibraryRepository { store }
@@ -42,9 +43,8 @@ final class AppContainer {
     }
 
     /// Drive the sync engine from auth state: start on sign-in, stop on sign-out.
-    /// With `StubAuth` this fires once for the shared dev user.
     func startSync() async {
-        for await userID in auth.userIDs() {
+        for await userID in keyAuth.userIDs() {
             if let userID {
                 await syncEngine.start(userID: userID)
             } else {
