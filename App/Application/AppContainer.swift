@@ -15,6 +15,12 @@ import ReaderCore
 final class AppContainer {
     let store: SwiftDataStore
     let storage: BookStorage
+    /// Reconciles local reading positions with the cloud. Started in `startSync()`.
+    let syncEngine: ReadingStateSyncEngine
+
+    /// Stub identity for the first cut — a shared dev user so two devices sync to
+    /// one account without real auth. Replaced by Firebase email-link in P2.5.
+    private let auth: any AuthProviding = StubAuth()
 
     /// Features depend on the protocols, not the concrete `SwiftDataStore`.
     var library: any LibraryRepository { store }
@@ -32,6 +38,19 @@ final class AppContainer {
         }
         self.store = stack.store
         self.storage = stack.storage
+        self.syncEngine = ReadingStateSyncEngine(store: stack.store, remote: FirebaseSyncClient())
+    }
+
+    /// Drive the sync engine from auth state: start on sign-in, stop on sign-out.
+    /// With `StubAuth` this fires once for the shared dev user.
+    func startSync() async {
+        for await userID in auth.userIDs() {
+            if let userID {
+                await syncEngine.start(userID: userID)
+            } else {
+                await syncEngine.stop()
+            }
+        }
     }
 
     func makeImporter() -> BookImporter {

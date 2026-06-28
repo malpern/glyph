@@ -20,6 +20,9 @@ packages:
   Readium:
     url: https://github.com/readium/swift-toolkit
     from: "3.10.0"
+  Firebase:
+    url: https://github.com/firebase/firebase-ios-sdk
+    from: "12.15.0"
 
 targets:
   Reader:
@@ -58,3 +61,7 @@ targets:
         product: ReadiumStreamer
       - package: Readium
         product: ReadiumNavigator
+      - package: Firebase
+        product: FirebaseFirestore
+      - package: Firebase
+        product: FirebaseAuth

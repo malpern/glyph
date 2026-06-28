@@ -21,13 +21,20 @@ final class ReaderViewModel {
 
     private let fileURL: URL
     private let readingState: any ReadingStateRepository
+    private let syncEngine: ReadingStateSyncEngine?
     private var saveTask: Task<Void, Never>?
     private var latestLocator: Locator?
 
-    init(book: Book, fileURL: URL, readingState: any ReadingStateRepository) {
+    init(
+        book: Book,
+        fileURL: URL,
+        readingState: any ReadingStateRepository,
+        syncEngine: ReadingStateSyncEngine? = nil
+    ) {
         self.book = book
         self.fileURL = fileURL
         self.readingState = readingState
+        self.syncEngine = syncEngine
     }
 
     func load() async {
@@ -73,5 +80,6 @@ final class ReaderViewModel {
     private func persist(_ locator: Locator) async {
         guard let data = LocatorCoding.data(from: locator) else { return }
         try? await readingState.updateLocator(bookID: book.id, locator: data)
+        await syncEngine?.pushDirty()   // propagate to other devices promptly
     }
 }

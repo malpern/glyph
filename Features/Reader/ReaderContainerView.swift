@@ -9,9 +9,14 @@ struct ReaderContainerView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var showChrome = true
 
-    init(book: Book, fileURL: URL, readingState: any ReadingStateRepository) {
+    init(
+        book: Book,
+        fileURL: URL,
+        readingState: any ReadingStateRepository,
+        syncEngine: ReadingStateSyncEngine?
+    ) {
         _viewModel = State(initialValue: ReaderViewModel(
-            book: book, fileURL: fileURL, readingState: readingState
+            book: book, fileURL: fileURL, readingState: readingState, syncEngine: syncEngine
         ))
     }
 
