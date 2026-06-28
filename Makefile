@@ -11,7 +11,7 @@ SWIFT_TEST := swift test --package-path $(PACKAGE) --no-parallel
 
 .DEFAULT_GOAL := test
 
-.PHONY: test test-watch generate test-app help
+.PHONY: test test-watch generate build test-app help
 
 ## test: Run the fast ReaderCore unit suite (no simulator). Use this constantly.
 test:
@@ -24,6 +24,19 @@ test-watch:
 ## generate: Regenerate the Xcode project from project.yml (XcodeGen).
 generate:
 	xcodegen generate
+
+## build: Compile the full app for the simulator (no signing). The pre-push gate
+## for Features/App code, since hosted CI can't build it (the app targets iOS 27 /
+## Xcode 27; GitHub runners only have Xcode 16). ReaderCore changes don't need this.
+build: generate
+	xcodebuild build \
+		-project Glyph.xcodeproj \
+		-scheme Glyph \
+		-configuration Debug \
+		-destination 'generic/platform=iOS Simulator' \
+		-skipMacroValidation \
+		CODE_SIGNING_ALLOWED=NO \
+		-quiet
 
 ## test-app: Run the full app test target in the simulator (slow; pre-push / CI).
 ## Requires an app unit-test target wired into project.yml (see TESTING.md, Tier 2).
