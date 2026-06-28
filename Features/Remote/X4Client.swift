@@ -20,6 +20,8 @@ final class X4Client {
     private(set) var state: ConnectionState = .disconnected
     /// Decoded inbound events (ready / pong / acks / buttons / unknown).
     var onEvent: ((RemoteEvent) -> Void)?
+    /// Fired when the connection drops unexpectedly (not on an intentional disconnect).
+    var onDisconnect: (() -> Void)?
 
     let url: URL
     private let session = URLSession(configuration: .default)
@@ -80,6 +82,7 @@ final class X4Client {
                 if !Task.isCancelled {
                     state = .failed(error.localizedDescription)
                     self.task = nil
+                    onDisconnect?()
                 }
                 return
             }

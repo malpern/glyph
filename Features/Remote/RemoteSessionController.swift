@@ -19,10 +19,13 @@ final class RemoteSessionController {
     private weak var speech: SpeechController?
     private var lastSpine = -1
     private var lastPara = -1
+    private var reconnectTask: Task<Void, Never>?
+    private var reconnectAttempt = 0
 
     init(speech: SpeechController) {
         self.speech = speech
         client.onEvent = { [weak self] event in self?.handle(event) }
+        client.onDisconnect = { [weak self] in self?.scheduleReconnect() }
         // TTS paragraph crossings drive the X4's page turns.
         speech.onPositionChange = { [weak self] spine, para, _, paragraphChanged in
             guard paragraphChanged else { return }
@@ -36,12 +39,28 @@ final class RemoteSessionController {
 
     func start() {
         isActive = true
+        reconnectAttempt = 0
         client.connect()
     }
 
     func stop() {
         isActive = false
+        reconnectTask?.cancel()
+        reconnectTask = nil
         client.disconnect()
+    }
+
+    /// Retry the connection with capped exponential backoff while the session is active.
+    private func scheduleReconnect() {
+        guard isActive else { return }
+        reconnectTask?.cancel()
+        let delay = min(pow(2.0, Double(reconnectAttempt)), 10.0)   // 1, 2, 4, 8, 10, 10…
+        reconnectAttempt += 1
+        reconnectTask = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(delay))
+            guard !Task.isCancelled, let self, self.isActive else { return }
+            self.client.connect()
+        }
     }
 
     // MARK: -
@@ -56,6 +75,7 @@ final class RemoteSessionController {
     private func handle(_ event: RemoteEvent) {
         switch event {
         case .ready:
+            reconnectAttempt = 0   // healthy connection
             // On (re)connect, re-announce where we are so the device re-syncs.
             if lastPara >= 0 { client.send(.goto(spine: lastSpine, para: lastPara)) }
         case let .button(action):
