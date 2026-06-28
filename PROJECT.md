@@ -118,12 +118,35 @@ All seven milestones built, committed, and verified on the iPhone 17 simulator:
 | M6 | Locator-based resume | **read to Ch. VI → relaunch → resumed to Ch. VI** |
 | M7 | Polish + this doc | clean Swift-6 build, no warnings in app code |
 
-### Phase 2 seams (already in place)
-- **Sync engine** plugs in behind `LibraryRepository` / `ReadingStateRepository`;
-  records already carry `updatedAt` + `deletedAt` tombstones, `ReadingState` carries
-  `pendingSync`. No CloudKit (non-Apple device target).
-- **Shared clients** (iPad/Mac): `ReaderCore` is UI-free and Readium-free — reusable as-is.
-- **TTS / highlights / notes**: positions are Readium `Locator`s end to end; `Bookmark`
-  and `Highlight` models and storage already exist (unused in Phase 1).
+## Status — Phase 2a: cross-device position sync (Firebase) — working
+
+Reading position now syncs across devices via Cloud Firestore (free Spark tier,
+project `ios-reader-22859`). The architecture's payoff: sync slots in behind the
+existing repositories with no feature rewrites.
+
+| # | Milestone | Verified by |
+|---|---|---|
+| P2.1 | Firebase project + SDK (Firestore/Auth) | app builds + links Firebase 12.15 |
+| P2.2 | Sync core in `ReaderCore` (engine, protocols) | 4 engine tests: convergence, LWW both ways |
+| P2.3 | `FirebaseSyncClient` + wiring | push/observe over Firestore; engine started in `AppContainer` |
+| P2.4 | Cross-device verify | **A read to Ch. IV → B (other simulator) opened to Ch. IV** |
+| P2.5 | Real email-link auth | *pending* (stub shared user for now) |
+
+**How it's built (recap):** `ReaderCore/Sync` defines `RemoteSyncClient` /
+`AuthProviding` / `ReadingStateSyncStore` and a pure `ReadingStateSyncEngine`
+(pull-before-push reconcile, last-writer-wins on `updatedAt`). The App layer's
+`FirebaseSyncClient` implements the transport
+(`users/{uid}/readingStates/{sha256(bookID)}`); Firebase never enters `ReaderCore`.
+Local SwiftData stays the source of truth; Firestore is transport. Identity is a
+stubbed shared user (`dev-shared-user`) until P2.5.
+
+**Firebase ops:** `firebase deploy --only firestore:rules` updates rules
+(`firestore.rules`); the project/app are managed via the `firebase` CLI. The
+`GoogleService-Info.plist` is app-embedded config, not a secret.
+
+### Still ahead
+- **P2.5 email-link auth**: replace `StubAuth`, tighten rules to `request.auth.uid`.
+- **Shared clients** (iPad/Mac): `ReaderCore` (UI-free, Readium-free, backend-free) reuses as-is.
+- **Bookmarks/highlights + book-file sync**: the engine and models extend to these next.
 
 See `/Users/malpern/.claude/plans/dreamy-beaming-sphinx.md` for the full plan.
