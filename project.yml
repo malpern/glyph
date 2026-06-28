@@ -45,6 +45,9 @@ targets:
         # Lets users import .epub files from Files/other apps.
         UIFileSharingEnabled: true
         LSSupportsOpeningDocumentsInPlace: true
+        # Keep read-aloud playing to AirPods when the screen locks / app backgrounds.
+        UIBackgroundModes:
+          - audio
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: dev.malpern.Glyph

@@ -29,13 +29,30 @@ struct ReaderContainerView: View {
                     ToolbarItem(placement: .topBarLeading) {
                         Button("Close", systemImage: "chevron.left") { close() }
                     }
+                    ToolbarItem(placement: .topBarTrailing) {
+                        if let speech = viewModel.speech {
+                            Button {
+                                Task { await viewModel.toggleSpeech() }
+                            } label: {
+                                Image(systemName: speech.isPlaying ? "pause.fill" : "play.fill")
+                            }
+                            .accessibilityLabel(speech.isPlaying ? "Pause read-aloud" : "Read aloud")
+                        }
+                    }
                 }
                 // Native Liquid Glass nav bar that auto-hides for distraction-free
                 // reading; tapping the page toggles it.
                 .toolbarVisibility(showChrome ? .visible : .hidden, for: .navigationBar)
                 .statusBarHidden(!showChrome)
         }
-        .task { await viewModel.load() }
+        .task {
+            await viewModel.load()
+            #if DEBUG
+            if ProcessInfo.processInfo.environment["READER_AUTOSPEAK"] == "1" {
+                await viewModel.toggleSpeech()
+            }
+            #endif
+        }
     }
 
     @ViewBuilder private var content: some View {

@@ -18,6 +18,8 @@ final class ReaderViewModel {
 
     let book: Book
     private(set) var state: State = .loading
+    /// Text-to-speech for this session, created once the publication opens.
+    private(set) var speech: SpeechController?
 
     private let fileURL: URL
     private let readingState: any ReadingStateRepository
@@ -40,9 +42,23 @@ final class ReaderViewModel {
     func load() async {
         do {
             let publication = try await ReadiumStack.open(at: fileURL)
+            speech = SpeechController(content: SpineContentProvider(fileURL: fileURL))
             state = .ready(publication, initialLocator: await restoredLocator())
         } catch {
             state = .failed(error.localizedDescription)
+        }
+    }
+
+    /// Start / pause / resume read-aloud. (Starts at the first spine for now;
+    /// starting at the current page is a later refinement.)
+    func toggleSpeech() async {
+        guard let speech else { return }
+        if speech.isPlaying {
+            speech.pause()
+        } else if speech.paragraphOrdinal == 0 {
+            await speech.start(spineIndex: 0)
+        } else {
+            speech.play()
         }
     }
 

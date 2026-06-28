@@ -2,6 +2,7 @@ import Foundation
 import UIKit
 import ReadiumShared
 import ReadiumStreamer
+import ReaderCore
 
 /// Reader-side error surface, kept deliberately small for Phase 1.
 enum ReaderError: Error, LocalizedError {
@@ -49,6 +50,29 @@ enum ReadiumStack {
         let author = publication.metadata.authors.first?.name
         let coverPNG = ((try? await publication.cover().get()) ?? nil)?.pngData()
         return PublicationMetadata(identifier: identifier, title: title, author: author, coverPNG: coverPNG)
+    }
+
+    /// Number of spine items. Opens its own publication (nonisolated) and returns a
+    /// plain `Int`, so the non-Sendable `Publication` never leaves this boundary.
+    static func spineCount(at url: URL) async throws -> Int {
+        try await makePublication(at: url).readingOrder.count
+    }
+
+    /// Parse a spine item into `Paragraph`s for TTS + X4 addressing. Reads the
+    /// **raw, untransformed** bytes (the same bytes the X4 unzips) and counts `<p>`
+    /// ordinals via `SpineParser`. Done entirely in this nonisolated function so the
+    /// non-Sendable `Publication`/`Resource` never cross an isolation domain; only
+    /// the `Sendable` `[Paragraph]` is returned.
+    static func paragraphs(at url: URL, spineIndex: Int) async throws -> [Paragraph] {
+        let publication = try await makePublication(at: url)
+        guard publication.readingOrder.indices.contains(spineIndex) else {
+            throw ReaderError.unsupportedPublication
+        }
+        guard let resource = publication.get(publication.readingOrder[spineIndex]) else {
+            throw ReaderError.unreadableFile
+        }
+        let data = try await resource.read().get()
+        return SpineParser.paragraphs(fromHTML: data)
     }
 
     private static func makePublication(at url: URL) async throws -> Publication {
