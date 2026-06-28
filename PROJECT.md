@@ -176,9 +176,15 @@ is `/Users/malpern/local-code/x4-auto-reader/docs/addressing-contract.md` (sourc
 and ▶ to read aloud — the X4 follows. Per-sentence on-device highlight is deferred
 (needs a firmware change); page-follow via `goto` is the live path.
 
+Also built (phone side, hardware-independent):
+- **Start at the current page** — read-aloud begins at the on-screen spine (locator→spine match).
+- **Lock-screen / AirPods / Control Center controls** — `MPRemoteCommandCenter` + Now Playing
+  drive play/pause/skip into the same `SpeechController` (the native sibling of the X4 buttons).
+- **Auto-reconnect** — the X4 link retries with backoff and re-announces position on reconnect (verified vs the mock).
+
 ### Still ahead (X4)
-- **Start at the current page** (TTS currently starts at the first text spine).
+- **Real-device run** — verify page-follow against the physical X4 (needs the hardware).
 - **Per-sentence highlight** (`highlight{spine,para,sent}`) once the firmware retains paragraph index per line.
-- **Phase 4 buttons**: inbound `button` events already route into the playback controller; wire when the device sends them.
+- **Phase 4 device buttons** — inbound `button` events already route into the playback controller; live when the firmware sends them.
 
 See `/Users/malpern/.claude/plans/dreamy-beaming-sphinx.md` for the full plan.
