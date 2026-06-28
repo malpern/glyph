@@ -10,10 +10,19 @@ ReaderCore behind a protocol rather than testing it through the app target.
 
 | Tier | What | Command | Where it runs |
 |------|------|---------|---------------|
+| **0 — App compiles** | The full app target builds (Features + App, Readium + Firebase). | `make build` | Pre-push (local) — see CI note below |
 | **1 — ReaderCore unit** | Sync engine, persistence, parser, X4 protocol codec. Pure logic over protocols, fakes for I/O. | `make test` | Every save (local) + every PR (CI) |
-| **2 — App / Features unit** | View-model behavior, Firebase client vs the **Firestore emulator**, keychain/auth. Needs the app target + simulator. | `make test-app` | Pre-push (local, opt-in) + every PR (CI) |
-| **3 — Integration / E2E** | Emulator round-trip convergence, a few XCUITest smoke flows. | (see below) | CI only (UI: nightly) |
+| **2 — App / Features unit** | View-model behavior, Firebase client vs the **Firestore emulator**, keychain/auth. Needs the app target + simulator. | `make test-app` | Pre-push (local) |
+| **3 — Integration / E2E** | Emulator round-trip convergence, a few XCUITest smoke flows. | (see below) | Local / future self-hosted CI |
 | **Manual** | X4 e-ink page-follow over WebSocket, TTS/AirPods. Hardware/AV-dependent. | TestFlight + `/verify` | By hand |
+
+> **Why CI only runs Tier 1.** The app targets **iOS 27 / Xcode 27**, and
+> GitHub-hosted runners only ship up to **Xcode 16** — they have no iOS 27 SDK, so
+> the app target can't build there. ReaderCore's `swift test` works in CI because it
+> builds for the **macOS host**, not the iOS SDK. Until hosted runners catch up (or
+> we add a self-hosted runner on a Mac with Xcode 27), Tiers 0/2/3 are **local
+> pre-push gates**: run `make build` before pushing any change to `App/` or
+> `Features/`, since CI won't catch a compile break there.
 
 ### Tier 1 — the inner loop (this is where new tests go)
 
@@ -65,8 +74,10 @@ transport against the local **Firestore emulator** (never prod), key derivation.
 ## CI (GitHub Actions)
 
 `.github/workflows/ci.yml` runs **Tier 1 on every push and PR** — fast because it
-needs no simulator. As Tier 2/3 land, add them as separate jobs (and push the
-XCUITest job to a nightly cron so PR latency stays low).
+needs no simulator. Tiers 0/2/3 can't run on hosted CI yet (the iOS 27 / Xcode 27
+SDK gap above), so they stay local pre-push gates for now. The unlock is a
+**self-hosted macOS runner with Xcode 27**; once that exists, add `make build` as a
+job and the XCUITest smoke flows on a nightly cron so PR latency stays low.
 
 ## Code review
 
