@@ -63,6 +63,7 @@ struct LibraryView: View {
             .overlay { if viewModel.isImporting { ProgressView().controlSize(.large) } }
             .task {
                 await viewModel.load()
+                await viewModel.ingestInbox()
                 await runAutoDemoIfRequested()
             }
         }
