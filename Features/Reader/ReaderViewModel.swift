@@ -28,6 +28,9 @@ final class ReaderViewModel {
     private let syncEngine: ReadingStateSyncEngine?
     private var saveTask: Task<Void, Never>?
     private var latestLocator: Locator?
+    private var publication: Publication?
+    /// Spine index of the page currently on screen — where read-aloud should begin.
+    private var currentSpineIndex = 0
 
     init(
         book: Book,
@@ -44,23 +47,25 @@ final class ReaderViewModel {
     func load() async {
         do {
             let publication = try await ReadiumStack.open(at: fileURL)
+            self.publication = publication
+            let initialLocator = await restoredLocator()
+            if let initialLocator { currentSpineIndex = spineIndex(for: initialLocator) ?? 0 }
             let speechController = SpeechController(content: SpineContentProvider(fileURL: fileURL))
             speech = speechController
             remoteSession = RemoteSessionController(speech: speechController)
-            state = .ready(publication, initialLocator: await restoredLocator())
+            state = .ready(publication, initialLocator: initialLocator)
         } catch {
             state = .failed(error.localizedDescription)
         }
     }
 
-    /// Start / pause / resume read-aloud. (Starts at the first spine for now;
-    /// starting at the current page is a later refinement.)
+    /// Start / pause / resume read-aloud, beginning at the page on screen.
     func toggleSpeech() async {
         guard let speech else { return }
         if speech.isPlaying {
             speech.pause()
         } else if speech.paragraphOrdinal == 0 {
-            await speech.start(spineIndex: 0)
+            await speech.start(spineIndex: currentSpineIndex)
         } else {
             speech.play()
         }
@@ -70,6 +75,7 @@ final class ReaderViewModel {
     /// page turns collapses into one write.
     func locationChanged(_ locator: Locator) {
         latestLocator = locator
+        if let index = spineIndex(for: locator) { currentSpineIndex = index }
         saveTask?.cancel()
         saveTask = Task { [weak self] in
             try? await Task.sleep(for: .milliseconds(700))
@@ -94,6 +100,12 @@ final class ReaderViewModel {
     }
 
     // MARK: -
+
+    /// The spine (reading-order) index a locator points into, by normalized-URL match.
+    private func spineIndex(for locator: Locator) -> Int? {
+        guard let publication else { return nil }
+        return publication.readingOrder.firstIndex { locator.href.isEquivalentTo($0.url()) }
+    }
 
     private func restoredLocator() async -> Locator? {
         guard
