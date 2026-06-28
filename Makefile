@@ -3,17 +3,23 @@
 
 PACKAGE := Packages/ReaderCore
 
+# --no-parallel: the SwiftData-backed suites (PersistenceTests, SyncEngineTests)
+# create in-memory stores that aren't safe to spin up concurrently — Swift Testing's
+# default cross-suite parallelism races them into an occasional SIGSEGV. The suite is
+# sub-second, so serializing costs nothing.
+SWIFT_TEST := swift test --package-path $(PACKAGE) --no-parallel
+
 .DEFAULT_GOAL := test
 
 .PHONY: test test-watch generate test-app help
 
 ## test: Run the fast ReaderCore unit suite (no simulator). Use this constantly.
 test:
-	swift test --package-path $(PACKAGE)
+	$(SWIFT_TEST)
 
 ## test-watch: Re-run ReaderCore tests on file change (needs `brew install watchexec`).
 test-watch:
-	watchexec -e swift -w $(PACKAGE)/Sources -w $(PACKAGE)/Tests -- swift test --package-path $(PACKAGE)
+	watchexec -e swift -w $(PACKAGE)/Sources -w $(PACKAGE)/Tests -- $(SWIFT_TEST)
 
 ## generate: Regenerate the Xcode project from project.yml (XcodeGen).
 generate:
