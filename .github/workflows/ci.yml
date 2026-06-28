@@ -1,0 +1,29 @@
+name: CI
+
+# Fast inner-loop gate: builds and runs the ReaderCore unit suite on every push
+# and PR. ReaderCore is dependency-free (no Readium/Firebase), so this needs no
+# simulator and no SPM network fetch — it's the same `swift test` developers run
+# locally, just enforced on every change.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  # New pushes to a branch cancel the previous in-flight run for that ref.
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  readercore-tests:
+    name: ReaderCore unit tests
+    runs-on: macos-15  # Xcode 16.x — bundles Swift Testing (`import Testing`)
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Show toolchain
+        run: swift --version
+
+      - name: Run ReaderCore tests
+        run: swift test --package-path Packages/ReaderCore
