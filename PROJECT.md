@@ -129,24 +129,33 @@ existing repositories with no feature rewrites.
 | P2.1 | Firebase project + SDK (Firestore/Auth) | app builds + links Firebase 12.15 |
 | P2.2 | Sync core in `ReaderCore` (engine, protocols) | 4 engine tests: convergence, LWW both ways |
 | P2.3 | `FirebaseSyncClient` + wiring | push/observe over Firestore; engine started in `AppContainer` |
-| P2.4 | Cross-device verify | **A read to Ch. IV → B (other simulator) opened to Ch. IV** |
-| P2.5 | Real email-link auth | *pending* (stub shared user for now) |
+| P2.4 | Cross-device verify (stub user) | A read to Ch. IV → B opened to Ch. IV |
+| P2.5 | Key-based real auth | **same verified over authenticated Firestore; data under `request.auth.uid`** |
 
 **How it's built (recap):** `ReaderCore/Sync` defines `RemoteSyncClient` /
 `AuthProviding` / `ReadingStateSyncStore` and a pure `ReadingStateSyncEngine`
 (pull-before-push reconcile, last-writer-wins on `updatedAt`). The App layer's
 `FirebaseSyncClient` implements the transport
 (`users/{uid}/readingStates/{sha256(bookID)}`); Firebase never enters `ReaderCore`.
-Local SwiftData stays the source of truth; Firestore is transport. Identity is a
-stubbed shared user (`dev-shared-user`) until P2.5.
+Local SwiftData stays the source of truth; Firestore is transport.
+
+**Identity (P2.5): a key, not a password.** The user holds one high-entropy *sync
+key*; the app deterministically derives a Firebase email+password from it and signs
+in silently (`SyncKey` + `FirebaseKeyAuth`). So the same key on two devices →
+the same account → the same data, with **no credential typed anywhere** — ideal for
+the no-keyboard X4 (drop a key file) and easy on phones (copy / QR in the Sync
+screen, reachable from the library toolbar). Firestore rules enforce
+`request.auth.uid == userID`. Email/Password auth must be enabled once in the Firebase
+console (free-tier Auth init is console-gated; the API path needs Blaze billing).
 
 **Firebase ops:** `firebase deploy --only firestore:rules` updates rules
 (`firestore.rules`); the project/app are managed via the `firebase` CLI. The
 `GoogleService-Info.plist` is app-embedded config, not a secret.
 
 ### Still ahead
-- **P2.5 email-link auth**: replace `StubAuth`, tighten rules to `request.auth.uid`.
-- **Shared clients** (iPad/Mac): `ReaderCore` (UI-free, Readium-free, backend-free) reuses as-is.
+- **Shared clients** (iPad/Mac/X4): `ReaderCore` (UI-free, Readium-free, backend-free) reuses as-is.
 - **Bookmarks/highlights + book-file sync**: the engine and models extend to these next.
+- **Live in-reader jump**: today a remote position applies on next *open*; could re-navigate live.
+- **Remove DEBUG launch hooks** before any real release.
 
 See `/Users/malpern/.claude/plans/dreamy-beaming-sphinx.md` for the full plan.
