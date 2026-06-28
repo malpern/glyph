@@ -149,10 +149,36 @@ console (free-tier Auth init is console-gated; the API path needs Blaze billing)
 (`firestore.rules`); the project/app are managed via the `firebase` CLI. The
 `GoogleService-Info.plist` is app-embedded config, not a secret.
 
-### Still ahead
+### Still ahead (sync)
 - **Shared clients** (iPad/Mac/X4): `ReaderCore` (UI-free, Readium-free, backend-free) reuses as-is.
 - **Bookmarks/highlights + book-file sync**: the engine and models extend to these next.
-- **Live in-reader jump**: today a remote position applies on next *open*; could re-navigate live.
 - **Remove DEBUG launch hooks** before any real release.
+
+## Status — Phase 3: X4 e-ink page-follow (TTS-driven) — phone side built
+
+The phone is the "brain": it does TTS to AirPods and tells the X4 e-ink reader which
+paragraph it's speaking, so the X4 turns its own pages to follow along. Audio is
+always phone → AirPods; the X4 is a synchronized display + (later) remote.
+
+| Piece | What | Where |
+|---|---|---|
+| Addressing | `<p>` start-tag scan over RAW spine bytes → 1-based ordinals matching the X4's expat count; simple-punctuation sentences | `ReaderCore/Reading` (tested) |
+| Protocol | discriminated, forward-compatible `RemoteCommand`/`RemoteEvent` codec (`ping`/`goto` live) | `ReaderCore/Remote` (tested) |
+| TTS | `SpeechController` — AVSpeechSynthesizer → AirPods, driven by the paragraph model, tracks `(spine,para,sentence)` | `Features/Reader` |
+| Link | `X4Client` (WebSocket `ws://crosspoint.local:81`) + `RemoteSessionController` (page-follow) | `Features/Remote` |
+
+**Verified (phone side, vs `Tools/mock_x4.py`):** app connects, and as TTS speaks each
+paragraph it sends `{"cmd":"goto","para":N,"spine":S}` in order. The addressing contract
+is `/Users/malpern/local-code/x4-auto-reader/docs/addressing-contract.md` (source of truth).
+
+**To test against the real X4:** open the same EPUB on the device, press Volume Up
+(it shows `ws://…:81`), then in the reader tap the broadcast icon to start the session
+and ▶ to read aloud — the X4 follows. Per-sentence on-device highlight is deferred
+(needs a firmware change); page-follow via `goto` is the live path.
+
+### Still ahead (X4)
+- **Start at the current page** (TTS currently starts at the first text spine).
+- **Per-sentence highlight** (`highlight{spine,para,sent}`) once the firmware retains paragraph index per line.
+- **Phase 4 buttons**: inbound `button` events already route into the playback controller; wire when the device sends them.
 
 See `/Users/malpern/.claude/plans/dreamy-beaming-sphinx.md` for the full plan.
