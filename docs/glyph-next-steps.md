@@ -17,13 +17,17 @@ requests) is preserved verbatim at the bottom as the canonical contract referenc
   re-announce, and a bidirectional position bridge (phone adopts the X4's reported `pos`).
 - **Reader settings.** Theme (light / sepia / dark), text size, line spacing, font —
   persisted app-wide, applied live via Readium `EPUBPreferences`.
-- **In-phone per-sentence highlighting (NEW).** The sentence being read aloud is
-  highlighted on the phone screen and kept in view, driven by the *same* raw-spine
-  segmentation that drives AirPods + the X4. Implemented as a Readium text-locator
-  `Decoration` (`tts` group) — Readium fuzzy-matches the sentence text in the page DOM, so
-  no precise DOM range is needed. `go(to:)` only turns the page when the sentence crosses a
-  page boundary. See `SpeechController.spokenSentence`, `ReaderViewModel.ttsHighlight`,
-  `EPUBReaderView.updateUIViewController`.
+- **In-phone read-aloud highlighting.** The unit being read aloud is highlighted on the
+  phone screen and kept in view, driven by the *same* raw-spine segmentation that drives
+  AirPods + the X4. Implemented as a Readium text-locator `Decoration` (`tts` group) —
+  Readium fuzzy-matches the text in the page DOM, so no precise DOM range is needed. See
+  `SpeechController.spokenSentence`, `ReaderViewModel.ttsLocators`, `EPUBReaderView`.
+- **Read-aloud granularity setting.** One Sentence / Paragraph / Page setting (default
+  **Paragraph**) drives the phone highlight, the page-follow cadence, *and* what's emitted
+  to the X4 — sentence highlight / paragraph mark (`sent` omitted) / `goto`. In
+  Paragraph/Page the follow target only changes per paragraph, so the page turns at most
+  once per paragraph (fixes per-sentence follow jumpiness). `RemoteCommand.highlight`'s
+  `sentence` is now optional. See `HighlightGranularity`, `RemoteSessionController`.
 - **Deploy pipeline.** `fastlane` lanes (`beta`, `register_app_id`, `add_internal_tester`,
   `tf_status`) — autonomous build → TestFlight via the App Store Connect API key. Live on
   TestFlight as **"Glyph: Read & Listen"** (`dev.malpern.Glyph`). Apple capability +
@@ -31,27 +35,23 @@ requests) is preserved verbatim at the bottom as the canonical contract referenc
 
 ## Next (prioritized)
 
-1. **Highlight-granularity setting (sentence / paragraph / page).** Firmware request #1 —
-   the dominant X4 UX lever, because e-ink refresh on every highlight move is slow. Phone
-   highlight can stay per-sentence (no refresh cost); the setting governs *what the phone
-   emits to the X4 and how often*. Default likely **Paragraph** for listen-and-glance.
-2. **Page-follow polish (phone).** Today the phone follows per-sentence via `go(to:)`.
-   Tune so it doesn't fight manual scrolling — e.g. follow at paragraph granularity, or
-   only re-center when the sentence is off-screen, plus a "resume follow" affordance.
-3. **X4 real-device end-to-end test** (page-follow + sentence highlight + position bridge).
-   Gated on hardware. (Task X4.)
-4. **Reverse-resume**: open the X4 → it jumps to the phone's newer cloud position. Gated on
+1. **X4 real-device end-to-end test** (page-follow + sentence highlight + position bridge,
+   across all three granularities). Gated on hardware. (Task X4.)
+2. **Follow refinement (optional).** Paragraph/Page cadence already removes most
+   per-sentence jumpiness. A further nicety: suppress auto-follow briefly after a *manual*
+   page turn (so re-reading isn't yanked), or only re-center when the unit is off-screen.
+3. **Reverse-resume**: open the X4 → it jumps to the phone's newer cloud position. Gated on
    the firmware adding a freshness marker to `ready` so the phone knows whose position wins.
-5. **Bookmarks & highlights** — persisted locally and synced through the existing
+4. **Bookmarks & highlights** — persisted locally and synced through the existing
    `ReadingStateSyncEngine` (same envelope: `updatedAt` / `deletedAt` / `pendingSync`).
-6. **Release-build optimization.** Currently archived with `SWIFT_OPTIMIZATION_LEVEL=-Onone`
+5. **Release-build optimization.** Currently archived with `SWIFT_OPTIMIZATION_LEVEL=-Onone`
    to dodge a Swift optimizer crash compiling SwiftSoup (a Readium dep) in Release.
    Confirmed present in **both Xcode 27 beta 1 (27A5194q) and beta 2 (27A5209h)**; `singlefile`
    did not help. It's an unfixed toolchain bug — revisit on the next toolchain bump
    (`fastlane beta` re-test is one command). Negligible impact for a reader app.
-7. **TTS voice selection.** Firmware noted the phone and X4 voices "both sound like OpenAI
+6. **TTS voice selection.** Firmware noted the phone and X4 voices "both sound like OpenAI
    voices." Pin the intended `AVSpeechSynthesisVoice` and surface a picker.
-8. **`pos` local authority.** When the X4 user turns a page with the physical buttons, the
+7. **`pos` local authority.** When the X4 user turns a page with the physical buttons, the
    phone should pause TTS and follow. The bridge adopts the position; confirm the
    pause-TTS-on-`pos` behavior end-to-end.
 
