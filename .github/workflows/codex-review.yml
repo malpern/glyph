@@ -3,14 +3,16 @@ name: Codex PR review
 # Runs OpenAI Codex over each pull request's diff and posts its feedback as a PR
 # comment. Uses the official openai/codex-action and an OPENAI_API_KEY repo secret.
 # On a public repo, pull_request runs from forks do NOT receive secrets, so the
-# review job only runs for branches pushed to this repo (your own PRs) — fork PRs
-# skip it rather than leaking the key.
+# codex job is gated to same-repo branches (your own PRs); fork PRs skip it
+# entirely rather than running with an empty key and failing.
 on:
   pull_request:
     types: [opened, synchronize, reopened]
 
 jobs:
   codex:
+    # Skip forks: they can't see OPENAI_API_KEY, so running there only fails.
+    if: github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     permissions:
       contents: read
