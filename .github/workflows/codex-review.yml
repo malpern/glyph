@@ -1,0 +1,87 @@
+name: Codex PR review
+
+# Runs OpenAI Codex over each PR's diff and posts its feedback as a PR comment.
+#
+# Security model (addresses the P0/P1 from Codex's own review of #6):
+#   * pull_request_target → the workflow AND the review prompt come from the
+#     trusted BASE branch, never from the PR. A PR therefore cannot rewrite the
+#     prompt (or this workflow) to coax the agent into leaking OPENAI_API_KEY.
+#   * The prompt is INLINE below (no PR-editable prompt file on disk).
+#   * The codex job is gated to same-repo branches — with pull_request_target,
+#     secrets are otherwise exposed to fork PRs, so this gate is what keeps only
+#     push-access authors able to trigger a secret-bearing run.
+#   * sandbox: read-only → the agent can read the checked-out diff but cannot
+#     write files or run privileged commands.
+# Residual (accepted): the agent still reads the PR's untrusted diff content, the
+# inherent risk of any AI reviewer. A dedicated, spend-limited OPENAI_API_KEY caps
+# the blast radius — recommended.
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened]
+
+permissions: {}
+
+jobs:
+  codex:
+    # Forks can't see OPENAI_API_KEY; only same-repo (push-access) PRs may run.
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      final_message: ${{ steps.run_codex.outputs.final-message }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: refs/pull/${{ github.event.pull_request.number }}/merge
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Run Codex
+        id: run_codex
+        uses: openai/codex-action@v1
+        with:
+          openai-api-key: ${{ secrets.OPENAI_API_KEY }}
+          sandbox: read-only
+          output-file: codex-output.md
+          prompt: |
+            Review the diff of this pull request for Glyph, a SwiftUI iOS EPUB
+            reader (Swift 6, targets iOS 27). Shared logic lives in
+            Packages/ReaderCore (a UIKit-free, Readium-free Swift package); App/
+            and Features/ hold the SwiftUI app, Readium navigator bridge, and
+            Firebase sync.
+
+            Report only high-priority issues — be terse and specific:
+            - P0: correctness bugs, crashes, data loss, or security/secret-handling
+              problems. The reading-position sync (last-writer-wins, dirty outbox)
+              and the X4 (spine, paragraph) <-> Readium addressing are the
+              highest-risk areas — a silent off-by-one or conflict-resolution
+              mistake corrupts a reader's position across devices.
+            - P1: missing test coverage for new logic, concurrency issues (this
+              code builds under Swift strict concurrency), or clear API/contract
+              violations.
+
+            Skip style nits, naming, and speculative refactors. If the diff is
+            clean, say so in one line. Reference findings by file:line.
+
+  post_feedback:
+    runs-on: ubuntu-latest
+    needs: codex
+    if: needs.codex.outputs.final_message != ''
+    permissions:
+      issues: write
+      pull-requests: write
+    steps:
+      - name: Post Codex feedback
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ github.token }}
+          script: |
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.pull_request.number,
+              body: process.env.CODEX_FINAL_MESSAGE,
+            });
+        env:
+          CODEX_FINAL_MESSAGE: ${{ needs.codex.outputs.final_message }}
