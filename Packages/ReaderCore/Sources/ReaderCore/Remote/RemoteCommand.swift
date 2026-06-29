@@ -14,9 +14,11 @@ public enum RemoteCommand: Sendable, Equatable {
     case goto(spine: Int, para: Int)
     /// `{"cmd":"open","bookId":"…"}` — announce/verify the loaded book. [PLANNED]
     case open(bookID: String)
-    /// `{"cmd":"highlight","spine":S,"para":P,"sent":N,"text":?}` — precise
-    /// per-sentence highlight; drop-in upgrade once the firmware supports it. [PLANNED]
-    case highlight(spine: Int, para: Int, sentence: Int, text: String?)
+    /// `{"cmd":"highlight","spine":S,"para":P,"sent":N,"text":?}` — highlight a
+    /// position on the X4. With `sentence` set, it's a precise per-sentence highlight;
+    /// with `sentence == nil` the `sent` key is omitted, which the firmware treats as
+    /// a calm whole-**paragraph** mark (left-margin accent bar). [LIVE]
+    case highlight(spine: Int, para: Int, sentence: Int?, text: String?)
     /// `{"cmd":"state","playing":B,"rate":R}` — mirror playback state. [PLANNED]
     case state(playing: Bool, rate: Double)
     /// `{"cmd":"count"}` — sentences on current page. [LIVE, TEST-ONLY]
@@ -32,7 +34,8 @@ public enum RemoteCommand: Sendable, Equatable {
         case let .open(bookID):
             object = ["cmd": "open", "bookId": bookID]
         case let .highlight(spine, para, sentence, text):
-            var o: [String: Any] = ["cmd": "highlight", "spine": spine, "para": para, "sent": sentence]
+            var o: [String: Any] = ["cmd": "highlight", "spine": spine, "para": para]
+            if let sentence { o["sent"] = sentence }   // omitted ⇒ paragraph mark
             if let text { o["text"] = text }
             object = o
         case let .state(playing, rate):

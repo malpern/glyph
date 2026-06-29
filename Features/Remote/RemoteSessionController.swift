@@ -24,19 +24,21 @@ final class RemoteSessionController {
     var onRemotePosition: ((_ spine: Int, _ para: Int, _ bookID: String?) -> Void)?
 
     private weak var speech: SpeechController?
+    private let granularity: () -> HighlightGranularity
     private var lastSpine = -1
     private var lastPara = -1
     private var lastSent = 0
     private var reconnectTask: Task<Void, Never>?
     private var reconnectAttempt = 0
 
-    init(speech: SpeechController) {
+    init(speech: SpeechController, granularity: @escaping () -> HighlightGranularity) {
         self.speech = speech
+        self.granularity = granularity
         client.onEvent = { [weak self] event in self?.handle(event) }
         client.onDisconnect = { [weak self] in self?.scheduleReconnect() }
-        // Every spoken sentence drives a precise highlight on the X4.
-        speech.onPositionChange = { [weak self] spine, para, sent, _ in
-            self?.sendHighlight(spine: spine, para: para, sent: sent)
+        // Drive the X4 at the user's chosen granularity (sentence / paragraph / page).
+        speech.onPositionChange = { [weak self] spine, para, sent, paragraphChanged in
+            self?.emit(spine: spine, para: para, sent: sent, paragraphChanged: paragraphChanged)
         }
     }
 
@@ -72,12 +74,28 @@ final class RemoteSessionController {
 
     // MARK: -
 
-    private func sendHighlight(spine: Int, para: Int, sent: Int) {
+    /// Record the current position and emit it at the chosen granularity. Paragraph
+    /// and page modes only fire on a paragraph boundary, so the slow e-ink screen
+    /// refreshes calmly instead of flashing on every sentence.
+    private func emit(spine: Int, para: Int, sent: Int, paragraphChanged: Bool) {
         guard isActive else { return }
         lastSpine = spine
         lastPara = para
         lastSent = sent
-        client.send(.highlight(spine: spine, para: para, sentence: sent, text: nil))
+        send(spine: spine, para: para, sent: sent, paragraphChanged: paragraphChanged)
+    }
+
+    private func send(spine: Int, para: Int, sent: Int, paragraphChanged: Bool) {
+        switch granularity() {
+        case .sentence:
+            client.send(.highlight(spine: spine, para: para, sentence: sent, text: nil))
+        case .paragraph:
+            guard paragraphChanged else { return }
+            client.send(.highlight(spine: spine, para: para, sentence: nil, text: nil))
+        case .page:
+            guard paragraphChanged else { return }
+            client.send(.goto(spine: spine, para: para))
+        }
     }
 
     private func handle(_ event: RemoteEvent) {
@@ -89,7 +107,7 @@ final class RemoteSessionController {
                 onRemotePosition?(spine ?? lastSpine, para, bookID)
             } else if lastPara >= 0 {
                 // Older firmware (no position) — re-announce ours so it re-syncs.
-                client.send(.highlight(spine: lastSpine, para: lastPara, sentence: lastSent, text: nil))
+                send(spine: lastSpine, para: lastPara, sent: lastSent, paragraphChanged: true)
             }
         case let .position(spine, para):
             // The user navigated on the X4.

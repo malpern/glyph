@@ -31,6 +31,8 @@ final class ReaderViewModel {
     private var publication: Publication?
     /// Spine index of the page currently on screen — where read-aloud should begin.
     private var currentSpineIndex = 0
+    /// App-wide reader settings (read-aloud granularity). Attached before `load()`.
+    private var settingsStore: ReaderSettingsStore?
 
     init(
         book: Book,
@@ -44,6 +46,9 @@ final class ReaderViewModel {
         self.syncEngine = syncEngine
     }
 
+    /// Wire app-wide settings (read-aloud granularity). Call before `load()`.
+    func attach(settings: ReaderSettingsStore) { settingsStore = settings }
+
     func load() async {
         do {
             let publication = try await ReadiumStack.open(at: fileURL)
@@ -55,7 +60,10 @@ final class ReaderViewModel {
                 bookTitle: book.title
             )
             speech = speechController
-            let session = RemoteSessionController(speech: speechController)
+            let session = RemoteSessionController(
+                speech: speechController,
+                granularity: { [weak self] in self?.settingsStore?.settings.highlightGranularity ?? .sentence }
+            )
             session.onRemotePosition = { [weak self] spine, para, bookID in
                 Task { await self?.adoptRemotePosition(spine: spine, para: para, bookID: bookID) }
             }
@@ -66,20 +74,37 @@ final class ReaderViewModel {
         }
     }
 
-    /// Text-based Readium locator for the sentence being read aloud right now, used
-    /// to draw the on-screen highlight. Readium resolves it by fuzzy-matching the
-    /// text in the page DOM, so no precise DOM range is required.
-    var ttsHighlight: Locator? {
+    /// Read-aloud highlight + page-follow targets for the current sentence, by
+    /// granularity. `highlight` is the decoration to draw (nil in `.page` mode);
+    /// `follow` is the locator to keep on screen (page-follows even in `.page` mode).
+    /// Both are text locators Readium resolves by fuzzy-matching in the page DOM, so
+    /// no precise DOM range is needed. The follow cadence is the granularity: in
+    /// `.paragraph`/`.page` the target only changes per paragraph, so the page turns
+    /// at most once per paragraph instead of on every sentence.
+    var ttsLocators: (highlight: Locator?, follow: Locator?) {
         guard let sentence = speech?.spokenSentence,
               let publication,
               publication.readingOrder.indices.contains(sentence.spineIndex)
-        else { return nil }
+        else { return (nil, nil) }
         let link = publication.readingOrder[sentence.spineIndex]
-        return Locator(
-            href: link.url(),
-            mediaType: link.mediaType ?? .html,
-            text: .init(after: sentence.after, before: sentence.before, highlight: sentence.text)
-        )
+        func locator(_ text: String, before: String?, after: String?) -> Locator {
+            Locator(
+                href: link.url(),
+                mediaType: link.mediaType ?? .html,
+                text: .init(after: after, before: before, highlight: text)
+            )
+        }
+        switch settingsStore?.settings.highlightGranularity ?? .sentence {
+        case .sentence:
+            let l = locator(sentence.sentenceText, before: sentence.before, after: sentence.after)
+            return (l, l)
+        case .paragraph:
+            let l = locator(sentence.paragraphText, before: nil, after: nil)
+            return (l, l)
+        case .page:
+            let l = locator(sentence.paragraphText, before: nil, after: nil)
+            return (nil, l)
+        }
     }
 
     /// Start / pause / resume read-aloud, beginning at the page on screen.

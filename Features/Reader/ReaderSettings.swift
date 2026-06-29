@@ -9,6 +9,8 @@ struct ReaderSettings: Codable, Equatable, Sendable {
     var fontScale: Double = 1.0     // 1.0 == 100%
     var lineHeight: Double = 1.4
     var font: ReaderFont = .original
+    /// How read-aloud highlights/follows on the phone, and what's emitted to the X4.
+    var highlightGranularity: HighlightGranularity = .paragraph
 
     var epubPreferences: EPUBPreferences {
         EPUBPreferences(
@@ -19,6 +21,23 @@ struct ReaderSettings: Codable, Equatable, Sendable {
             publisherStyles: font == .original ? nil : false,
             theme: theme.readiumTheme
         )
+    }
+}
+
+/// Read-aloud granularity — how often the highlight moves and the page follows on
+/// the phone, and (per the firmware contract) what command the X4 receives:
+/// - `.sentence` → highlight each sentence; emit `highlight{spine,para,sent}`.
+/// - `.paragraph` → highlight each paragraph; emit `highlight{spine,para}` (no `sent`).
+/// - `.page` → no text highlight, page-follow only; emit `goto{spine,para}`.
+/// The X4's e-ink refresh is slow, so coarser granularity = calmer screen.
+enum HighlightGranularity: String, Codable, CaseIterable, Sendable {
+    case sentence, paragraph, page
+    var label: String {
+        switch self {
+        case .sentence: return "Sentence"
+        case .paragraph: return "Paragraph"
+        case .page: return "Page"
+        }
     }
 }
 
@@ -76,6 +95,7 @@ final class ReaderSettingsStore {
         let env = ProcessInfo.processInfo.environment
         if let raw = env["READER_THEME"], let theme = ReaderTheme(rawValue: raw) { settings.theme = theme }
         if let raw = env["READER_FONT_SCALE"], let scale = Double(raw) { settings.fontScale = scale }
+        if let raw = env["READER_GRANULARITY"], let g = HighlightGranularity(rawValue: raw) { settings.highlightGranularity = g }
         #endif
     }
 

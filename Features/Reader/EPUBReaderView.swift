@@ -12,9 +12,12 @@ struct EPUBReaderView: UIViewControllerRepresentable {
     let initialLocator: Locator?
     /// Appearance (theme/font/size/spacing); applied live as it changes.
     let preferences: EPUBPreferences
-    /// The sentence being read aloud, highlighted on screen and kept in view.
-    /// `nil` clears the highlight.
+    /// The read-aloud unit to highlight on screen (`nil` clears it — e.g. page mode).
     let ttsHighlight: Locator?
+    /// The locator to keep on screen as read-aloud advances (page-follow); `nil` when
+    /// not reading. Changes at the granularity cadence, so the page turns only when
+    /// the followed unit moves off the page.
+    let ttsFollow: Locator?
     /// Forwarded from the navigator on every position change (a `Locator`).
     let onLocationChange: (Locator) -> Void
     /// A center tap that the navigator didn't consume — used to toggle chrome.
@@ -49,16 +52,22 @@ struct EPUBReaderView: UIViewControllerRepresentable {
             navigator.submitPreferences(preferences)
         }
 
-        // Read-aloud: highlight the spoken sentence and keep it on screen. Readium
-        // resolves the text locator by fuzzy-matching in the page DOM; go(to:) only
-        // turns the page when the sentence crosses a page boundary.
+        // Read-aloud highlight: draw the decoration over the spoken unit. Readium
+        // resolves the text locator by fuzzy-matching in the page DOM.
         if context.coordinator.lastHighlight != ttsHighlight {
             context.coordinator.lastHighlight = ttsHighlight
             let decorations: [Decoration] = ttsHighlight.map {
                 [Decoration(id: "tts-current", locator: $0, style: .highlight(tint: .systemYellow, isActive: true))]
             } ?? []
             navigator.apply(decorations: decorations, in: "tts")
-            if let locator = ttsHighlight {
+        }
+
+        // Read-aloud page-follow: keep the spoken unit on screen. The follow target
+        // changes at the granularity cadence, so go(to:) turns the page only when the
+        // unit crosses a page boundary (no-op while it's already visible).
+        if context.coordinator.lastFollow != ttsFollow {
+            context.coordinator.lastFollow = ttsFollow
+            if let locator = ttsFollow {
                 Task { await navigator.go(to: locator, options: NavigatorGoOptions(animated: false)) }
             }
         }
@@ -85,6 +94,7 @@ struct EPUBReaderView: UIViewControllerRepresentable {
         private let onTap: () -> Void
         var lastPreferences: EPUBPreferences?
         var lastHighlight: Locator?
+        var lastFollow: Locator?
 
         init(onLocationChange: @escaping (Locator) -> Void, onTap: @escaping () -> Void) {
             self.onLocationChange = onLocationChange

@@ -32,9 +32,11 @@ final class SpeechController: NSObject, AVSpeechSynthesizerDelegate {
 
     struct SpokenSentence: Equatable {
         let spineIndex: Int
-        let text: String
+        let sentenceText: String
         let before: String?
         let after: String?
+        /// The full text of the current `<p>` — for paragraph-granularity highlighting.
+        let paragraphText: String
     }
 
     /// Fired whenever the spoken position changes; `paragraphChanged` is true when
@@ -179,7 +181,11 @@ final class SpeechController: NSObject, AVSpeechSynthesizerDelegate {
             ? String(units[index - 1].text.suffix(40)) : nil
         let after = (units.indices.contains(index + 1) && units[index + 1].paragraph == unit.paragraph)
             ? String(units[index + 1].text.prefix(40)) : nil
-        spokenSentence = SpokenSentence(spineIndex: spineIndex, text: unit.text, before: before, after: after)
+        let paragraphText = units.filter { $0.paragraph == unit.paragraph }.map(\.text).joined(separator: " ")
+        spokenSentence = SpokenSentence(
+            spineIndex: spineIndex, sentenceText: unit.text,
+            before: before, after: after, paragraphText: paragraphText
+        )
     }
 
     private func advanceToNextSpine() async {

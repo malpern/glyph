@@ -23,6 +23,12 @@ import Foundation
         #expect(withText.contains(#""text":"It was a bright cold day""#))
     }
 
+    @Test func encodesParagraphMarkWhenSentenceOmitted() {
+        // Paragraph granularity: no "sent" key ⇒ firmware draws a whole-paragraph mark.
+        #expect(RemoteCommand.highlight(spine: 4, para: 12, sentence: nil, text: nil).jsonString()
+            == #"{"cmd":"highlight","para":12,"spine":4}"#)
+    }
+
     @Test func encodesOpenWithUnescapedSlashes() {
         // bookId is often a URL-like dc:identifier; slashes should not be escaped.
         #expect(RemoteCommand.open(bookID: "http://www.gutenberg.org/11").jsonString()

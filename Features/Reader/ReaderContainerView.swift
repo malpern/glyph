@@ -68,6 +68,7 @@ struct ReaderContainerView: View {
                 }
         }
         .task {
+            viewModel.attach(settings: container.readerSettings)
             await viewModel.load()
             #if DEBUG
             let env = ProcessInfo.processInfo.environment
@@ -87,11 +88,13 @@ struct ReaderContainerView: View {
                 Button("Close") { dismiss() }
             }
         case let .ready(publication, initialLocator):
+            let tts = viewModel.ttsLocators
             EPUBReaderView(
                 publication: publication,
                 initialLocator: initialLocator,
                 preferences: container.readerSettings.epubPreferences,
-                ttsHighlight: viewModel.ttsHighlight,
+                ttsHighlight: tts.highlight,
+                ttsFollow: tts.follow,
                 onLocationChange: { viewModel.locationChanged($0) },
                 onTap: { withAnimation(.easeInOut(duration: 0.2)) { showChrome.toggle() } }
             )
