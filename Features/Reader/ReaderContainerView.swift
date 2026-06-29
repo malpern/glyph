@@ -91,6 +91,7 @@ struct ReaderContainerView: View {
                 publication: publication,
                 initialLocator: initialLocator,
                 preferences: container.readerSettings.epubPreferences,
+                ttsHighlight: viewModel.ttsHighlight,
                 onLocationChange: { viewModel.locationChanged($0) },
                 onTap: { withAnimation(.easeInOut(duration: 0.2)) { showChrome.toggle() } }
             )

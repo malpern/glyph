@@ -1,4 +1,63 @@
-# Glyph (phone) next steps — from the X4 firmware side
+# Glyph — status & next steps
+
+Living roadmap for the **Glyph / iOS** side of the two-device (phone "brain" + X4 e-ink)
+synchronized-reading system. The firmware agent's handoff (what the X4 provides and
+requests) is preserved verbatim at the bottom as the canonical contract reference.
+
+## Where the phone is now (built)
+
+- **Phase 1 — local reader.** Import EPUB → library → open → resume. Readium navigator
+  behind a SwiftUI/`Locator` boundary; SwiftData behind repository protocols; positions
+  are always Readium `Locator`s (never page numbers).
+- **Phase 2 — cloud sync.** Firebase (Firestore + Auth), key-based real auth, reading-
+  position sync with last-writer-wins on `updatedAt`. Firebase confined to the App layer;
+  `ReaderCore` stays dependency-free.
+- **Phase 3 — X4 integration.** TTS → AirPods (`SpeechController`), page-follow (`goto`),
+  per-sentence highlight to the X4, lock-screen / AirPods media controls, auto-reconnect +
+  re-announce, and a bidirectional position bridge (phone adopts the X4's reported `pos`).
+- **Reader settings.** Theme (light / sepia / dark), text size, line spacing, font —
+  persisted app-wide, applied live via Readium `EPUBPreferences`.
+- **In-phone per-sentence highlighting (NEW).** The sentence being read aloud is
+  highlighted on the phone screen and kept in view, driven by the *same* raw-spine
+  segmentation that drives AirPods + the X4. Implemented as a Readium text-locator
+  `Decoration` (`tts` group) — Readium fuzzy-matches the sentence text in the page DOM, so
+  no precise DOM range is needed. `go(to:)` only turns the page when the sentence crosses a
+  page boundary. See `SpeechController.spokenSentence`, `ReaderViewModel.ttsHighlight`,
+  `EPUBReaderView.updateUIViewController`.
+- **Deploy pipeline.** `fastlane` lanes (`beta`, `register_app_id`, `add_internal_tester`,
+  `tf_status`) — autonomous build → TestFlight via the App Store Connect API key. Live on
+  TestFlight as **"Glyph: Read & Listen"** (`dev.malpern.Glyph`). Apple capability +
+  recipe documented in `~/.config/agent/ACCESS.md`.
+
+## Next (prioritized)
+
+1. **Highlight-granularity setting (sentence / paragraph / page).** Firmware request #1 —
+   the dominant X4 UX lever, because e-ink refresh on every highlight move is slow. Phone
+   highlight can stay per-sentence (no refresh cost); the setting governs *what the phone
+   emits to the X4 and how often*. Default likely **Paragraph** for listen-and-glance.
+2. **Page-follow polish (phone).** Today the phone follows per-sentence via `go(to:)`.
+   Tune so it doesn't fight manual scrolling — e.g. follow at paragraph granularity, or
+   only re-center when the sentence is off-screen, plus a "resume follow" affordance.
+3. **X4 real-device end-to-end test** (page-follow + sentence highlight + position bridge).
+   Gated on hardware. (Task X4.)
+4. **Reverse-resume**: open the X4 → it jumps to the phone's newer cloud position. Gated on
+   the firmware adding a freshness marker to `ready` so the phone knows whose position wins.
+5. **Bookmarks & highlights** — persisted locally and synced through the existing
+   `ReadingStateSyncEngine` (same envelope: `updatedAt` / `deletedAt` / `pendingSync`).
+6. **Release-build optimization.** Currently archived with `SWIFT_OPTIMIZATION_LEVEL=-Onone`
+   to dodge a Swift optimizer crash compiling SwiftSoup (a Readium dep) in Release.
+   Confirmed present in **both Xcode 27 beta 1 (27A5194q) and beta 2 (27A5209h)**; `singlefile`
+   did not help. It's an unfixed toolchain bug — revisit on the next toolchain bump
+   (`fastlane beta` re-test is one command). Negligible impact for a reader app.
+7. **TTS voice selection.** Firmware noted the phone and X4 voices "both sound like OpenAI
+   voices." Pin the intended `AVSpeechSynthesisVoice` and surface a picker.
+8. **`pos` local authority.** When the X4 user turns a page with the physical buttons, the
+   phone should pause TTS and follow. The bridge adopts the position; confirm the
+   pause-TTS-on-`pos` behavior end-to-end.
+
+---
+
+## Reference: from the firmware side (X4 agent handoff)
 
 Handoff for the **Glyph / iOS agent**. The X4 firmware side of the synchronized-
 reading experience is built and device-verified. This is what the firmware now
@@ -9,8 +68,6 @@ provides and what the phone should build next.
 (local sibling: `/Users/malpern/local-code/x4-auto-reader/docs/addressing-contract.md`).
 Messages there are tagged `[LIVE]` (device-verified) vs `[PLANNED]`. The LIVE
 commands you need are summarized inline below, so this doc is usable standalone.
-
-## Phone build list (priority order)
 
 ### 1. Highlight-granularity setting (NEW — please build)
 

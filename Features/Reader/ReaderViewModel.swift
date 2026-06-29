@@ -66,6 +66,22 @@ final class ReaderViewModel {
         }
     }
 
+    /// Text-based Readium locator for the sentence being read aloud right now, used
+    /// to draw the on-screen highlight. Readium resolves it by fuzzy-matching the
+    /// text in the page DOM, so no precise DOM range is required.
+    var ttsHighlight: Locator? {
+        guard let sentence = speech?.spokenSentence,
+              let publication,
+              publication.readingOrder.indices.contains(sentence.spineIndex)
+        else { return nil }
+        let link = publication.readingOrder[sentence.spineIndex]
+        return Locator(
+            href: link.url(),
+            mediaType: link.mediaType ?? .html,
+            text: .init(after: sentence.after, before: sentence.before, highlight: sentence.text)
+        )
+    }
+
     /// Start / pause / resume read-aloud, beginning at the page on screen.
     func toggleSpeech() async {
         guard let speech else { return }

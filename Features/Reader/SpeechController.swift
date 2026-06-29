@@ -25,6 +25,18 @@ final class SpeechController: NSObject, AVSpeechSynthesizerDelegate {
     private(set) var isPlaying = false
     private(set) var rate: Float = AVSpeechUtteranceDefaultSpeechRate
 
+    /// The sentence currently being spoken, with intra-paragraph context — used to
+    /// draw the on-screen highlight (Readium resolves it by fuzzy text match, so no
+    /// precise DOM range is needed).
+    private(set) var spokenSentence: SpokenSentence?
+
+    struct SpokenSentence: Equatable {
+        let spineIndex: Int
+        let text: String
+        let before: String?
+        let after: String?
+    }
+
     /// Fired whenever the spoken position changes; `paragraphChanged` is true when
     /// we cross into a new `<p>` — the trigger to send `goto` to the X4.
     var onPositionChange: ((_ spine: Int, _ paragraph: Int, _ sentence: Int, _ paragraphChanged: Bool) -> Void)?
@@ -54,6 +66,7 @@ final class SpeechController: NSObject, AVSpeechSynthesizerDelegate {
     /// Stop speaking and remove the Now Playing entry / remote handlers.
     func tearDown() {
         pause()
+        spokenSentence = nil
         nowPlaying.clear()
     }
 
@@ -127,6 +140,7 @@ final class SpeechController: NSObject, AVSpeechSynthesizerDelegate {
         paragraphOrdinal = unit.paragraph
         sentenceIndex = unit.sentence
         onPositionChange?(spineIndex, unit.paragraph, unit.sentence, changed)
+        publishSpokenSentence()
         updateNowPlaying()
 
         #if DEBUG
@@ -152,7 +166,20 @@ final class SpeechController: NSObject, AVSpeechSynthesizerDelegate {
             paragraphOrdinal = unit.paragraph
             sentenceIndex = unit.sentence
             onPositionChange?(spineIndex, unit.paragraph, unit.sentence, true)
+            publishSpokenSentence()
         }
+    }
+
+    /// Publish the current sentence (plus intra-paragraph neighbours for fuzzy-match
+    /// context) so the reader can highlight it on screen.
+    private func publishSpokenSentence() {
+        guard units.indices.contains(index) else { spokenSentence = nil; return }
+        let unit = units[index]
+        let before = (index > 0 && units[index - 1].paragraph == unit.paragraph)
+            ? String(units[index - 1].text.suffix(40)) : nil
+        let after = (units.indices.contains(index + 1) && units[index + 1].paragraph == unit.paragraph)
+            ? String(units[index + 1].text.prefix(40)) : nil
+        spokenSentence = SpokenSentence(spineIndex: spineIndex, text: unit.text, before: before, after: after)
     }
 
     private func advanceToNextSpine() async {
