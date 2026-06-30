@@ -81,6 +81,38 @@ import Foundation
         #expect(loaded?.locator == loc)
     }
 
+    @Test func bookmarkCRUDIsLiveThenTombstoned() async throws {
+        let store = try makeStore()
+        let bookID = "urn:isbn:9780000000001"
+        let loc = Data("{\"href\":\"c1.xhtml\"}".utf8)
+        let a = Bookmark(bookID: bookID, locator: loc)
+        let b = Bookmark(bookID: bookID, locator: Data("{\"href\":\"c2.xhtml\"}".utf8))
+        try await store.addBookmark(a)
+        try await store.addBookmark(b)
+        #expect(try await store.bookmarks(bookID: bookID).count == 2)
+
+        try await store.deleteBookmark(id: a.id)
+        let live = try await store.bookmarks(bookID: bookID)
+        #expect(live.count == 1)                       // tombstoned, hidden
+        #expect(live.first?.id == b.id)
+    }
+
+    @Test func highlightAddUpdateDelete() async throws {
+        let store = try makeStore()
+        let bookID = "urn:isbn:9780000000001"
+        let loc = Data("{\"href\":\"c1.xhtml\",\"text\":{\"highlight\":\"call me Ishmael\"}}".utf8)
+        var h = Highlight(bookID: bookID, locator: loc, text: "call me Ishmael", color: "yellow")
+        try await store.addHighlight(h)
+        #expect(try await store.highlights(bookID: bookID).first?.color == "yellow")
+
+        h.color = "green"
+        try await store.updateHighlight(h)
+        #expect(try await store.highlights(bookID: bookID).first?.color == "green")
+
+        try await store.deleteHighlight(id: h.id)
+        #expect(try await store.highlights(bookID: bookID).isEmpty)
+    }
+
     @Test func writeStampsRecentUpdatedAt() async throws {
         let store = try makeStore()
         let before = Date()

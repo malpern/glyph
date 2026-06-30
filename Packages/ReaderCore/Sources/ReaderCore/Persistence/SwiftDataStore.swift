@@ -79,6 +79,49 @@ public actor SwiftDataStore: LibraryRepository, ReadingStateRepository {
         try modelContext.save()
     }
 
+    // MARK: Bookmarks & highlights
+
+    public func bookmarks(bookID: String) throws -> [Bookmark] {
+        try liveBookmarks(bookID: bookID).map { $0.toDomain() }
+    }
+
+    public func addBookmark(_ bookmark: Bookmark) throws {
+        modelContext.insert(BookmarkEntity.make(from: bookmark))
+        try modelContext.save()
+    }
+
+    public func deleteBookmark(id: UUID) throws {
+        guard let entity = try bookmarkEntity(id: id) else { return }
+        entity.deletedAt = Date()      // tombstone
+        entity.updatedAt = Date()
+        try modelContext.save()
+    }
+
+    public func highlights(bookID: String) throws -> [Highlight] {
+        try liveHighlights(bookID: bookID).map { $0.toDomain() }
+    }
+
+    public func addHighlight(_ highlight: Highlight) throws {
+        modelContext.insert(HighlightEntity.make(from: highlight))
+        try modelContext.save()
+    }
+
+    public func updateHighlight(_ highlight: Highlight) throws {
+        guard let entity = try highlightEntity(id: highlight.id) else { return }
+        entity.locator = highlight.locator
+        entity.text = highlight.text
+        entity.color = highlight.color
+        entity.updatedAt = Date()
+        try modelContext.save()
+    }
+
+    public func deleteHighlight(id: UUID) throws {
+        guard let entity = try highlightEntity(id: id) else { return }
+        entity.deletedAt = Date()      // tombstone
+        entity.updatedAt = Date()
+        try modelContext.save()
+    }
+
     // MARK: - Fetch helpers
 
     private func bookEntity(id: String) throws -> BookEntity? {
@@ -111,6 +154,18 @@ public actor SwiftDataStore: LibraryRepository, ReadingStateRepository {
             predicate: #Predicate { $0.bookID == bookID && $0.deletedAt == nil },
             sortBy: [SortDescriptor(\.createdAt)]
         ))
+    }
+
+    private func bookmarkEntity(id: UUID) throws -> BookmarkEntity? {
+        var descriptor = FetchDescriptor<BookmarkEntity>(predicate: #Predicate { $0.id == id })
+        descriptor.fetchLimit = 1
+        return try modelContext.fetch(descriptor).first
+    }
+
+    private func highlightEntity(id: UUID) throws -> HighlightEntity? {
+        var descriptor = FetchDescriptor<HighlightEntity>(predicate: #Predicate { $0.id == id })
+        descriptor.fetchLimit = 1
+        return try modelContext.fetch(descriptor).first
     }
 
     /// Upsert the bookmarks/highlights carried by a `ReadingState` by their stable
