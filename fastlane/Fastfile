@@ -99,6 +99,53 @@ platform :ios do
   # Internal testing needs no Apple review. The group is created with access to all
   # builds, so every upload (this one + future) appears automatically once processed.
   # Internal testers must be team members (the account holder already is).
+  desc "Diagnose why a tester isn't seeing builds (team users + tester state)"
+  lane :tf_diag do
+    require 'spaceship'
+    Spaceship::ConnectAPI.token = Spaceship::ConnectAPI::Token.create(
+      key_id: ASC_KEY[:key_id], issuer_id: ASC_KEY[:issuer_id], filepath: ASC_KEY[:key_filepath]
+    )
+    email = "malpern@me.com"
+    users = (Spaceship::ConnectAPI::User.all rescue [])
+    UI.message("Team users: #{users.map { |u| u.email }.join(', ')}")
+    UI.message("Is #{email} a team user? #{users.any? { |u| u.email&.casecmp?(email) }}")
+    testers = (Spaceship::ConnectAPI::BetaTester.all(filter: { "email" => email }) rescue [])
+    if testers.empty?
+      UI.message("No betaTester record for #{email}")
+    else
+      testers.each { |t| UI.message("Tester #{t.email}: state=#{t.beta_tester_state.inspect} invite=#{t.invite_type.inspect}") }
+    end
+  end
+
+  desc "Resend the TestFlight invitation email to a tester"
+  lane :tf_invite do
+    require 'spaceship'; require 'net/http'; require 'json'
+    Spaceship::ConnectAPI.token = Spaceship::ConnectAPI::Token.create(
+      key_id: ASC_KEY[:key_id], issuer_id: ASC_KEY[:issuer_id], filepath: ASC_KEY[:key_filepath]
+    )
+    email = "malpern@me.com"
+    tester = (Spaceship::ConnectAPI::BetaTester.all(filter: { "email" => email }) rescue []).first
+    UI.user_error!("No betaTester for #{email}") unless tester
+    app = Spaceship::ConnectAPI::App.find(APP_ID)
+    uri = URI("https://api.appstoreconnect.apple.com/v1/betaTesterInvitations")
+    req = Net::HTTP::Post.new(uri)
+    req["Authorization"] = "Bearer #{Spaceship::ConnectAPI.token.text}"
+    req["Content-Type"] = "application/json"
+    req.body = { data: {
+      type: "betaTesterInvitations",
+      relationships: {
+        app: { data: { type: "apps", id: app.id } },
+        betaTester: { data: { type: "betaTesters", id: tester.id } }
+      }
+    } }.to_json
+    res = Net::HTTP.start(uri.host, uri.port, use_ssl: true) { |h| h.request(req) }
+    if res.code.to_i.between?(200, 299)
+      UI.success("Invitation (re)sent to #{email}")
+    else
+      UI.important("Invite failed: #{res.code} #{res.body[0, 300]}")
+    end
+  end
+
   desc "Show TestFlight groups, their testers, and latest build states"
   lane :tf_status do
     require 'spaceship'
