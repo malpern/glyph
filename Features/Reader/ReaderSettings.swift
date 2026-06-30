@@ -9,6 +9,10 @@ struct ReaderSettings: Codable, Equatable, Sendable {
     var fontScale: Double = 1.0     // 1.0 == 100%
     var lineHeight: Double = 1.4
     var font: ReaderFont = .original
+    /// Text alignment override. `.default` keeps the publisher's choice; the others
+    /// only take effect with publisher styles disabled (Readium gates text-align
+    /// behind `advancedSettings`), which `epubPreferences` handles automatically.
+    var textAlign: ReaderTextAlign = .default
     /// How read-aloud highlights/follows on the phone, and what's emitted to the X4.
     var highlightGranularity: HighlightGranularity = .sentence
     /// Which TTS engine reads aloud.
@@ -19,12 +23,16 @@ struct ReaderSettings: Codable, Equatable, Sendable {
     var elevenLabsVoiceID: String = "21m00Tcm4TlvDq8ikWAM"   // Rachel
 
     var epubPreferences: EPUBPreferences {
-        EPUBPreferences(
+        // A custom font OR a text-align override both require the publisher's styles
+        // disabled (Readium maps `advancedSettings = !publisherStyles`, and text-align
+        // is an advanced setting). Otherwise leave publisher styles on (nil = default).
+        let overridesPublisher = font != .original || textAlign != .default
+        return EPUBPreferences(
             fontFamily: font.readiumFontFamily,
             fontSize: fontScale,
             lineHeight: lineHeight,
-            // A custom font only takes effect with the publisher's styles disabled.
-            publisherStyles: font == .original ? nil : false,
+            publisherStyles: overridesPublisher ? false : nil,
+            textAlign: textAlign.readiumTextAlign,
             theme: theme.readiumTheme
         )
     }
@@ -39,6 +47,7 @@ struct ReaderSettings: Codable, Equatable, Sendable {
         fontScale = try c.decodeIfPresent(Double.self, forKey: .fontScale) ?? 1.0
         lineHeight = try c.decodeIfPresent(Double.self, forKey: .lineHeight) ?? 1.4
         font = try c.decodeIfPresent(ReaderFont.self, forKey: .font) ?? .original
+        textAlign = try c.decodeIfPresent(ReaderTextAlign.self, forKey: .textAlign) ?? .default
         highlightGranularity = try c.decodeIfPresent(HighlightGranularity.self, forKey: .highlightGranularity) ?? .sentence
         ttsProvider = try c.decodeIfPresent(TTSProvider.self, forKey: .ttsProvider) ?? .apple
         openAIVoice = try c.decodeIfPresent(String.self, forKey: .openAIVoice) ?? "onyx"
@@ -74,6 +83,26 @@ enum HighlightGranularity: String, Codable, CaseIterable, Sendable {
         case .paragraph: return "Paragraph"
         case .page: return "Page"
         case .off: return "Off"
+        }
+    }
+}
+
+/// Text alignment. `.default` defers to the publisher; `.left` / `.justify` override it
+/// (which Readium honours only with publisher styles off — see `epubPreferences`).
+enum ReaderTextAlign: String, Codable, CaseIterable, Sendable {
+    case `default`, left, justify
+    var readiumTextAlign: TextAlignment? {
+        switch self {
+        case .default: return nil
+        case .left: return .left
+        case .justify: return .justify
+        }
+    }
+    var label: String {
+        switch self {
+        case .default: return "Default"
+        case .left: return "Left"
+        case .justify: return "Justify"
         }
     }
 }

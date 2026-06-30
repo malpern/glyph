@@ -41,6 +41,17 @@ struct ReaderSettingsView: View {
                 }
 
                 Section {
+                    Picker("Alignment", selection: $store.settings.textAlign) {
+                        ForEach(ReaderTextAlign.allCases, id: \.self) { Text($0.label).tag($0) }
+                    }
+                    .pickerStyle(.segmented)
+                } header: {
+                    Text("Alignment")
+                } footer: {
+                    Text("“Default” keeps the publisher's alignment. Left or Justify override it (this turns off the publisher's own styling).")
+                }
+
+                Section {
                     Picker("Highlight", selection: $store.settings.highlightGranularity) {
                         ForEach(HighlightGranularity.allCases, id: \.self) { Text($0.label).tag($0) }
                     }
