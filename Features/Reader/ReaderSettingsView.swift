@@ -39,6 +39,33 @@ struct ReaderSettingsView: View {
                     }
                     .pickerStyle(.inline)
                 }
+
+                Section {
+                    Picker("Highlight", selection: $store.settings.highlightGranularity) {
+                        ForEach(HighlightGranularity.allCases, id: \.self) { Text($0.label).tag($0) }
+                    }
+                    .pickerStyle(.segmented)
+
+                    Picker("Voice", selection: $store.settings.ttsProvider) {
+                        ForEach(TTSProvider.allCases, id: \.self) { Text($0.label).tag($0) }
+                    }
+                    switch store.settings.ttsProvider {
+                    case .openai:
+                        Picker("OpenAI voice", selection: $store.settings.openAIVoice) {
+                            ForEach(OpenAISpeechEngine.voices, id: \.self) { Text($0.capitalized).tag($0) }
+                        }
+                    case .elevenlabs:
+                        Picker("ElevenLabs voice", selection: $store.settings.elevenLabsVoiceID) {
+                            ForEach(ElevenLabsSpeechEngine.voices, id: \.id) { Text($0.name).tag($0.id) }
+                        }
+                    case .apple:
+                        EmptyView()
+                    }
+                } header: {
+                    Text("Read-aloud")
+                } footer: {
+                    Text("Highlight granularity and the voice that reads aloud. OpenAI/ElevenLabs need an API key (Settings → TTS keys). A voice change applies on the next book you open.")
+                }
             }
             .navigationTitle("Reading")
             .navigationBarTitleDisplayMode(.inline)

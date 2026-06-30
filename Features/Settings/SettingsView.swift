@@ -21,56 +21,21 @@ struct SettingsView: View {
         NavigationStack {
             Form {
                 Section {
-                    Picker("Highlight", selection: Binding(
-                        get: { container.readerSettings.settings.highlightGranularity },
-                        set: { container.readerSettings.settings.highlightGranularity = $0 }
-                    )) {
-                        ForEach(HighlightGranularity.allCases, id: \.self) { Text($0.label).tag($0) }
-                    }
-                    .pickerStyle(.segmented)
-                } header: {
-                    Text("Read-aloud")
-                } footer: {
-                    Text("How the spoken position is highlighted and followed — and how often the X4 e-ink screen refreshes. Sentence is best for active read-along; Paragraph is calmer; Off is audio-only (no highlight, nothing sent to the X4).")
-                }
+                    LabeledContent("OpenAI") { Text(openAIKeySaved ? "Saved" : "Not set").foregroundStyle(.secondary) }
+                    SecureField(openAIKeySaved ? "Enter to replace OpenAI key" : "OpenAI API key (sk-…)", text: $openAIKey)
+                        .textInputAutocapitalization(.never).autocorrectionDisabled()
+                    Button(openAIKeySaved ? "Update OpenAI Key" : "Save OpenAI Key") { saveOpenAIKey() }
+                        .disabled(openAIKey.trimmingCharacters(in: .whitespaces).isEmpty)
 
-                Section {
-                    Picker("Voice", selection: Binding(
-                        get: { container.readerSettings.settings.ttsProvider },
-                        set: { container.readerSettings.settings.ttsProvider = $0 }
-                    )) {
-                        ForEach(TTSProvider.allCases, id: \.self) { Text($0.label).tag($0) }
-                    }
-                    if container.readerSettings.settings.ttsProvider == .openai {
-                        Picker("OpenAI voice", selection: Binding(
-                            get: { container.readerSettings.settings.openAIVoice },
-                            set: { container.readerSettings.settings.openAIVoice = $0 }
-                        )) {
-                            ForEach(OpenAISpeechEngine.voices, id: \.self) { Text($0.capitalized).tag($0) }
-                        }
-                        SecureField(openAIKeySaved ? "API key saved — enter to replace" : "OpenAI API key (sk-…)", text: $openAIKey)
-                            .textInputAutocapitalization(.never)
-                            .autocorrectionDisabled()
-                        Button(openAIKeySaved ? "Update Key" : "Save Key") { saveOpenAIKey() }
-                            .disabled(openAIKey.trimmingCharacters(in: .whitespaces).isEmpty)
-                    }
-                    if container.readerSettings.settings.ttsProvider == .elevenlabs {
-                        Picker("ElevenLabs voice", selection: Binding(
-                            get: { container.readerSettings.settings.elevenLabsVoiceID },
-                            set: { container.readerSettings.settings.elevenLabsVoiceID = $0 }
-                        )) {
-                            ForEach(ElevenLabsSpeechEngine.voices, id: \.id) { Text($0.name).tag($0.id) }
-                        }
-                        SecureField(elevenLabsKeySaved ? "API key saved — enter to replace" : "ElevenLabs API key", text: $elevenLabsKey)
-                            .textInputAutocapitalization(.never)
-                            .autocorrectionDisabled()
-                        Button(elevenLabsKeySaved ? "Update Key" : "Save Key") { saveElevenLabsKey() }
-                            .disabled(elevenLabsKey.trimmingCharacters(in: .whitespaces).isEmpty)
-                    }
+                    LabeledContent("ElevenLabs") { Text(elevenLabsKeySaved ? "Saved" : "Not set").foregroundStyle(.secondary) }
+                    SecureField(elevenLabsKeySaved ? "Enter to replace ElevenLabs key" : "ElevenLabs API key", text: $elevenLabsKey)
+                        .textInputAutocapitalization(.never).autocorrectionDisabled()
+                    Button(elevenLabsKeySaved ? "Update ElevenLabs Key" : "Save ElevenLabs Key") { saveElevenLabsKey() }
+                        .disabled(elevenLabsKey.trimmingCharacters(in: .whitespaces).isEmpty)
                 } header: {
-                    Text("Voice")
+                    Text("TTS API keys")
                 } footer: {
-                    Text("OpenAI reads with a cloud voice using your own API key (billed to you). Apple is on-device and free. A voice change applies the next time you open a book.")
+                    Text("For OpenAI / ElevenLabs read-aloud voices, billed to your own account. Pick the provider and voice in the reader's Aa menu. Apple's voice is on-device and free — no key needed.")
                 }
 
                 Section {
