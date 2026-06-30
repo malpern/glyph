@@ -54,6 +54,8 @@ final class SpeechController {
     private var spineCount = 0
     private var speaking = false   // an utterance is in flight (possibly paused)
     private var paused = false     // paused mid-utterance
+    private var audioObservers: [NSObjectProtocol] = []
+    private var wasPlayingBeforeInterruption = false
 
     init(content: SpineContentProvider, bookTitle: String, engine: SpeechEngine = AppleSpeechEngine()) {
         self.content = content
@@ -65,6 +67,52 @@ final class SpeechController {
         nowPlaying.onTogglePlayPause = { [weak self] in self?.togglePlayPause() }
         nowPlaying.onNext = { [weak self] in self?.nextSentence() }
         nowPlaying.onPrevious = { [weak self] in self?.previousSentence() }
+        observeAudioSession()
+    }
+
+    // MARK: - System audio events
+
+    /// React to system audio events like a real audio app: pause on a phone call / Siri
+    /// (resume after if the system says so), and pause when AirPods are pulled rather than
+    /// blasting the phone speaker. The notification blocks run on the main queue; they
+    /// capture only `Sendable` primitives and hop to the main actor to do the work.
+    private func observeAudioSession() {
+        let center = NotificationCenter.default
+        audioObservers.append(center.addObserver(
+            forName: AVAudioSession.interruptionNotification, object: nil, queue: .main
+        ) { [weak self] note in
+            let typeRaw = (note.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt) ?? 0
+            let optionsRaw = (note.userInfo?[AVAudioSessionInterruptionOptionKey] as? UInt) ?? 0
+            Task { @MainActor in self?.handleInterruption(typeRaw: typeRaw, optionsRaw: optionsRaw) }
+        })
+        audioObservers.append(center.addObserver(
+            forName: AVAudioSession.routeChangeNotification, object: nil, queue: .main
+        ) { [weak self] note in
+            let reasonRaw = (note.userInfo?[AVAudioSessionRouteChangeReasonKey] as? UInt) ?? 0
+            Task { @MainActor in self?.handleRouteChange(reasonRaw: reasonRaw) }
+        })
+    }
+
+    private func handleInterruption(typeRaw: UInt, optionsRaw: UInt) {
+        switch AVAudioSession.InterruptionType(rawValue: typeRaw) {
+        case .began:
+            wasPlayingBeforeInterruption = isPlaying
+            if isPlaying { pause() }
+        case .ended:
+            let options = AVAudioSession.InterruptionOptions(rawValue: optionsRaw)
+            if options.contains(.shouldResume), wasPlayingBeforeInterruption { play() }
+            wasPlayingBeforeInterruption = false
+        default:
+            break
+        }
+    }
+
+    private func handleRouteChange(reasonRaw: UInt) {
+        // A device we were playing to (e.g. AirPods) went away — pause, don't reroute to
+        // the phone speaker at full volume.
+        if AVAudioSession.RouteChangeReason(rawValue: reasonRaw) == .oldDeviceUnavailable, isPlaying {
+            pause()
+        }
     }
 
     /// Swap the TTS engine live (the user changed voice/provider). Re-speaks the current
@@ -86,6 +134,9 @@ final class SpeechController {
         paused = false
         spokenSentence = nil
         nowPlaying.clear()
+        audioObservers.forEach { NotificationCenter.default.removeObserver($0) }
+        audioObservers.removeAll()
+        deactivateAudioSession()   // let other apps (Music/Podcasts) un-duck and resume
     }
 
     private func updateNowPlaying() {
@@ -234,9 +285,20 @@ final class SpeechController {
 
     private func advanceToNextSpine() async {
         let next = spineIndex + 1
-        guard next < spineCount else { isPlaying = false; return }
+        guard next < spineCount else {
+            // Reached the end of the book — stop cleanly so the Now Playing panel and the
+            // audio session don't stay stuck in a "playing" state.
+            isPlaying = false
+            updateNowPlaying()
+            deactivateAudioSession()
+            return
+        }
         await load(spineIndex: next)
         if isPlaying { speakCurrent() }
+    }
+
+    private func deactivateAudioSession() {
+        try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
     }
 
     private func activateAudioSession() {

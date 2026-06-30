@@ -19,20 +19,23 @@ final class NowPlayingController {
     init(bookTitle: String) {
         self.bookTitle = bookTitle
         let center = MPRemoteCommandCenter.shared()
+        // MPRemoteCommandCenter doesn't guarantee its handlers run on the main thread, so
+        // hop to the main actor explicitly (assuming isolation would trap if delivered
+        // off-main). Return .success synchronously; the playback mutation happens on hop.
         center.playCommand.addTarget { [weak self] _ in
-            MainActor.assumeIsolated { self?.onPlay?() }; return .success
+            Task { @MainActor in self?.onPlay?() }; return .success
         }
         center.pauseCommand.addTarget { [weak self] _ in
-            MainActor.assumeIsolated { self?.onPause?() }; return .success
+            Task { @MainActor in self?.onPause?() }; return .success
         }
         center.togglePlayPauseCommand.addTarget { [weak self] _ in
-            MainActor.assumeIsolated { self?.onTogglePlayPause?() }; return .success
+            Task { @MainActor in self?.onTogglePlayPause?() }; return .success
         }
         center.nextTrackCommand.addTarget { [weak self] _ in
-            MainActor.assumeIsolated { self?.onNext?() }; return .success
+            Task { @MainActor in self?.onNext?() }; return .success
         }
         center.previousTrackCommand.addTarget { [weak self] _ in
-            MainActor.assumeIsolated { self?.onPrevious?() }; return .success
+            Task { @MainActor in self?.onPrevious?() }; return .success
         }
         center.nextTrackCommand.isEnabled = true
         center.previousTrackCommand.isEnabled = true
