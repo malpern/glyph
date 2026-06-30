@@ -5,15 +5,19 @@ import ReaderCore
 
 /// Drives text-to-speech from the **parsed paragraph model** (not the Readium
 /// WebView's pagination) and tracks exactly which (spine, paragraph, sentence) is
-/// being spoken — the position the X4 page-follow needs.
+/// being spoken — the position the X4 page-follow and on-screen highlight need.
 ///
-/// Audio is always phone → AirPods (spoken-audio playback session). The controller
-/// is the single playback surface: the on-screen controls AND the X4's forwarded
-/// physical buttons (Phase 4) both call the same `play/pause/next/previous/rate`
-/// methods, so inbound remote events "just work".
+/// Playback goes through a pluggable `SpeechEngine` (Apple / OpenAI / ElevenLabs);
+/// this controller owns only the *queue* and *position*. It speaks one sentence at a
+/// time and publishes the position on **audio start**, so the highlight + X4 stay in
+/// sync with the voice even when a cloud engine adds network latency.
+///
+/// Audio is always phone → AirPods (spoken-audio playback session). The controller is
+/// the single playback surface: the on-screen controls AND the X4's forwarded physical
+/// buttons both call the same `play/pause/next/previous/rate` methods.
 @MainActor
 @Observable
-final class SpeechController: NSObject, AVSpeechSynthesizerDelegate {
+final class SpeechController {
 
     /// A single spoken unit: one sentence, tagged with its X4 address.
     private struct Unit { let paragraph: Int; let sentence: Int; let text: String }
@@ -26,8 +30,7 @@ final class SpeechController: NSObject, AVSpeechSynthesizerDelegate {
     private(set) var rate: Float = AVSpeechUtteranceDefaultSpeechRate
 
     /// The sentence currently being spoken, with intra-paragraph context — used to
-    /// draw the on-screen highlight (Readium resolves it by fuzzy text match, so no
-    /// precise DOM range is needed).
+    /// draw the on-screen highlight (Readium resolves it by fuzzy text match).
     private(set) var spokenSentence: SpokenSentence?
 
     struct SpokenSentence: Equatable {
@@ -39,24 +42,23 @@ final class SpeechController: NSObject, AVSpeechSynthesizerDelegate {
         let paragraphText: String
     }
 
-    /// Fired whenever the spoken position changes; `paragraphChanged` is true when
-    /// we cross into a new `<p>` — the trigger to send `goto` to the X4.
+    /// Fired whenever the spoken position changes; `paragraphChanged` is true when we
+    /// cross into a new `<p>` — the trigger to send `goto` to the X4.
     var onPositionChange: ((_ spine: Int, _ paragraph: Int, _ sentence: Int, _ paragraphChanged: Bool) -> Void)?
 
     private let content: SpineContentProvider
-    private let synthesizer = AVSpeechSynthesizer()
+    private let engine: SpeechEngine
     private let nowPlaying: NowPlayingController
     private var units: [Unit] = []
     private var index = 0
     private var spineCount = 0
-    private var generation = 0                       // guards stale utterance callbacks
-    private var generationByUtterance: [ObjectIdentifier: Int] = [:]
+    private var speaking = false   // an utterance is in flight (possibly paused)
+    private var paused = false     // paused mid-utterance
 
-    init(content: SpineContentProvider, bookTitle: String) {
+    init(content: SpineContentProvider, bookTitle: String, engine: SpeechEngine = AppleSpeechEngine()) {
         self.content = content
+        self.engine = engine
         self.nowPlaying = NowPlayingController(bookTitle: bookTitle)
-        super.init()
-        synthesizer.delegate = self
         // Lock screen / AirPods / Control Center → the same playback surface.
         nowPlaying.onPlay = { [weak self] in self?.play() }
         nowPlaying.onPause = { [weak self] in self?.pause() }
@@ -67,7 +69,10 @@ final class SpeechController: NSObject, AVSpeechSynthesizerDelegate {
 
     /// Stop speaking and remove the Now Playing entry / remote handlers.
     func tearDown() {
-        pause()
+        isPlaying = false
+        engine.stop()
+        speaking = false
+        paused = false
         spokenSentence = nil
         nowPlaying.clear()
     }
@@ -95,9 +100,10 @@ final class SpeechController: NSObject, AVSpeechSynthesizerDelegate {
         guard !units.isEmpty else { return }
         activateAudioSession()
         isPlaying = true
-        if synthesizer.isPaused {
-            synthesizer.continueSpeaking()
-        } else if !synthesizer.isSpeaking {
+        if paused {
+            engine.resume()
+            paused = false
+        } else if !speaking {
             speakCurrent()
         }
         updateNowPlaying()
@@ -105,7 +111,10 @@ final class SpeechController: NSObject, AVSpeechSynthesizerDelegate {
 
     func pause() {
         isPlaying = false
-        if synthesizer.isSpeaking { synthesizer.pauseSpeaking(at: .word) }
+        if speaking {
+            engine.pause()
+            paused = true
+        }
         updateNowPlaying()
     }
 
@@ -138,6 +147,18 @@ final class SpeechController: NSObject, AVSpeechSynthesizerDelegate {
     private func speakCurrent() {
         guard units.indices.contains(index) else { return }
         let unit = units[index]
+        speaking = true
+        paused = false
+        engine.speak(
+            unit.text, rate: rate,
+            onStart: { [weak self] in self?.didStartSpeaking(unit) },
+            onFinish: { [weak self] in self?.didFinishSpeaking() }
+        )
+    }
+
+    /// The current sentence's audio actually started — publish its position now so the
+    /// on-screen highlight and the X4 land in sync with the voice.
+    private func didStartSpeaking(_ unit: Unit) {
         let changed = unit.paragraph != paragraphOrdinal
         paragraphOrdinal = unit.paragraph
         sentenceIndex = unit.sentence
@@ -148,22 +169,29 @@ final class SpeechController: NSObject, AVSpeechSynthesizerDelegate {
         #if DEBUG
         print("🔊 TTS spine=\(spineIndex) para=\(unit.paragraph) sent=\(unit.sentence): \(unit.text.prefix(48))")
         #endif
+    }
 
-        generation += 1
-        let utterance = AVSpeechUtterance(string: unit.text)
-        utterance.rate = rate
-        utterance.postUtteranceDelay = 0.05
-        generationByUtterance[ObjectIdentifier(utterance)] = generation
-        synthesizer.speak(utterance)
+    private func didFinishSpeaking() {
+        speaking = false
+        guard isPlaying else { return }
+        index += 1
+        if units.indices.contains(index) {
+            speakCurrent()
+        } else {
+            Task { await advanceToNextSpine() }
+        }
     }
 
     private func seek(to newIndex: Int) {
         guard units.indices.contains(newIndex) else { return }
         index = newIndex
-        synthesizer.stopSpeaking(at: .immediate)   // old utterance becomes stale (generation bumps below)
+        engine.stop()              // suppresses the in-flight utterance's onFinish
+        speaking = false
+        paused = false
         if isPlaying {
             speakCurrent()
         } else {
+            // Scrubbing while paused: move the position without speaking.
             let unit = units[newIndex]
             paragraphOrdinal = unit.paragraph
             sentenceIndex = unit.sentence
@@ -195,18 +223,6 @@ final class SpeechController: NSObject, AVSpeechSynthesizerDelegate {
         if isPlaying { speakCurrent() }
     }
 
-    private func finished(_ id: ObjectIdentifier) {
-        let isCurrent = generationByUtterance[id] == generation
-        generationByUtterance[id] = nil
-        guard isCurrent, isPlaying else { return }     // ignore stale (seeked-away) utterances
-        index += 1
-        if units.indices.contains(index) {
-            speakCurrent()
-        } else {
-            Task { await advanceToNextSpine() }
-        }
-    }
-
     private func activateAudioSession() {
         let session = AVAudioSession.sharedInstance()
         do {
@@ -215,17 +231,5 @@ final class SpeechController: NSObject, AVSpeechSynthesizerDelegate {
         } catch {
             // Non-fatal: speech still plays through the default route.
         }
-    }
-
-    // MARK: AVSpeechSynthesizerDelegate (called off the main actor → hop back)
-
-    nonisolated func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didFinish utterance: AVSpeechUtterance) {
-        let id = ObjectIdentifier(utterance)
-        Task { @MainActor in self.finished(id) }
-    }
-
-    nonisolated func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didCancel utterance: AVSpeechUtterance) {
-        let id = ObjectIdentifier(utterance)
-        Task { @MainActor in self.generationByUtterance[id] = nil }   // drop; never auto-advance on cancel
     }
 }
