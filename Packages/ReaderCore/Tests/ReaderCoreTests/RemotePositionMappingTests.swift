@@ -57,4 +57,26 @@ import Testing
             previous = p
         }
     }
+
+    // MARK: - paragraphOrdinal (inverse, for reporting the phone's position to the X4)
+
+    @Test func paragraphOrdinalRoundTripsWithProgression() {
+        let count = 7
+        for ordinal in 1...count {
+            let p = RemotePositionMapping.progression(paragraphOrdinal: ordinal, paragraphCount: count)
+            #expect(RemotePositionMapping.paragraphOrdinal(progression: p, paragraphCount: count) == ordinal)
+        }
+    }
+
+    @Test func paragraphOrdinalIsOneBasedAndClamped() {
+        #expect(RemotePositionMapping.paragraphOrdinal(progression: 0, paragraphCount: 4) == 1)
+        #expect(RemotePositionMapping.paragraphOrdinal(progression: 1.0, paragraphCount: 4) == 4)   // clamp to last
+        #expect(RemotePositionMapping.paragraphOrdinal(progression: -0.5, paragraphCount: 4) == 1)
+        #expect(RemotePositionMapping.paragraphOrdinal(progression: 0.5, paragraphCount: 0) == 1)   // no sub-position
+    }
+
+    @Test func continuousProgressionLandsInContainingParagraph() {
+        // Progression between paragraph 2 (0.25) and 3 (0.5) → still paragraph 2.
+        #expect(RemotePositionMapping.paragraphOrdinal(progression: 0.40, paragraphCount: 4) == 2)
+    }
 }

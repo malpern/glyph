@@ -18,10 +18,12 @@ final class RemoteSessionController {
     let client = X4Client()
     private(set) var isActive = false
 
-    /// Fired when the X4 reports its reading position (on connect via `ready`, or on a
-    /// manual `pos` change). The reader bridges this into the cloud sync. The `bookID`
-    /// (when present) lets the consumer verify both sides are on the same EPUB.
+    /// Fired when the X4 user takes control (a physical `pos` page-turn): the reader
+    /// pauses TTS, follows to that position, and mirrors it into cloud sync.
     var onRemotePosition: ((_ spine: Int, _ para: Int, _ bookID: String?) -> Void)?
+    /// The phone's current reading position, queried on connect so the phone can push it
+    /// to the X4 (`goto`) — phone-wins-on-connect, since the X4 has no trustworthy clock.
+    var phonePosition: (() async -> (spine: Int, para: Int)?)?
 
     private weak var speech: SpeechController?
     private let granularity: () -> HighlightGranularity
@@ -102,17 +104,18 @@ final class RemoteSessionController {
 
     private func handle(_ event: RemoteEvent) {
         switch event {
-        case let .ready(spine, para, bookID):
+        case .ready:
             reconnectAttempt = 0   // healthy connection
-            if let para {
-                // The X4 reported its position — bridge it into the cloud sync.
-                onRemotePosition?(spine ?? lastSpine, para, bookID)
-            } else if lastPara >= 0 {
-                // Older firmware (no position) — re-announce ours so it re-syncs.
-                send(spine: lastSpine, para: lastPara, sent: lastSent, paragraphChanged: true)
+            // Phone wins on connect: push our current cloud position to the X4 so it
+            // resumes where the phone is. (The X4 has no clock, so it can't arbitrate.)
+            Task { [weak self] in
+                guard let self, let pos = await self.phonePosition?() else { return }
+                self.lastSpine = pos.spine
+                self.lastPara = pos.para
+                self.client.send(.goto(spine: pos.spine, para: pos.para))
             }
         case let .position(spine, para):
-            // The user navigated on the X4.
+            // The X4 user turned a page with the buttons — they took control.
             if let para { onRemotePosition?(spine ?? lastSpine, para, nil) }
         case let .highlightAck(spine, para, _, ok):
             // Sentence wasn't on the resolved page — fall back to page-follow.

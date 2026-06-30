@@ -80,6 +80,7 @@ final class ReaderViewModel {
             session.onRemotePosition = { [weak self] spine, para, bookID in
                 Task { await self?.adoptRemotePosition(spine: spine, para: para, bookID: bookID) }
             }
+            session.phonePosition = { [weak self] in await self?.currentRemotePosition() }
             remoteSession = session
             state = .ready(publication, initialLocator: initialLocator)
         } catch {
@@ -246,17 +247,33 @@ final class ReaderViewModel {
 
     // MARK: -
 
-    /// Bridge: the X4 reported a reading position — write it into the synced
-    /// `ReadingState` (last-writer-wins) so this phone's next open, and the user's
-    /// other Glyph devices, resume there. The reverse (correcting the X4 to a newer
-    /// cloud position on connect) lands once the firmware sends a freshness marker.
+    /// Bridge: the X4 user turned a page with the physical buttons (`pos`) — they took
+    /// control. Pause read-aloud, follow the navigator to that position, and mirror it
+    /// into the synced `ReadingState` (last-writer-wins) so this phone's next open, and
+    /// the user's other Glyph devices, resume there.
     private func adoptRemotePosition(spine: Int, para: Int, bookID: String?) async {
         guard RemotePositionMapping.appliesToOpenBook(incomingBookID: bookID, currentBookID: book.id)
         else { return }   // stale report for a different book — ignore
-        guard let locator = await locator(forSpine: spine, paragraph: para),
-              let data = LocatorCoding.data(from: locator) else { return }
-        try? await readingState.updateLocator(bookID: book.id, locator: data)
-        await syncEngine?.pushDirty()
+        guard let locator = await locator(forSpine: spine, paragraph: para) else { return }
+        // User took control on the X4: stop reading aloud and follow on screen.
+        speech?.pause()
+        jumpToken += 1
+        pendingJump = JumpRequest(locator: locator, token: jumpToken)
+        if let data = LocatorCoding.data(from: locator) {
+            try? await readingState.updateLocator(bookID: book.id, locator: data)
+            await syncEngine?.pushDirty()
+        }
+    }
+
+    /// The phone's current reading position as the X4's `(spine, paragraph)` addressing,
+    /// derived from the navigator's current locator. Sent to the X4 on connect
+    /// (phone-wins). `nil` until a position is known.
+    private func currentRemotePosition() async -> (spine: Int, para: Int)? {
+        guard let locator = latestLocator, let spine = spineIndex(for: locator) else { return nil }
+        let count = (try? await ReadiumStack.paragraphs(at: fileURL, spineIndex: spine).count) ?? 0
+        let progression = locator.locations.progression ?? locator.locations.totalProgression ?? 0
+        let para = RemotePositionMapping.paragraphOrdinal(progression: progression, paragraphCount: count)
+        return (spine, para)
     }
 
     /// Approximate a Readium `Locator` for a `(spine, <p> ordinal)` position: the

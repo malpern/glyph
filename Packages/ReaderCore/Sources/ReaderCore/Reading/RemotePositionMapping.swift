@@ -31,4 +31,16 @@ public enum RemotePositionMapping {
         let clamped = min(zeroBased, count - 1)
         return Double(clamped) / Double(count)
     }
+
+    /// Inverse of `progression(paragraphOrdinal:paragraphCount:)`: map a Readium reading
+    /// progression in `[0, 1]` to the 1-based paragraph ordinal it falls within. Used to
+    /// report the phone's current position to the X4 (`goto` on connect). Round-trips with
+    /// `progression(...)` for in-range ordinals; for a continuous progression it returns
+    /// the paragraph containing it.
+    public static func paragraphOrdinal(progression: Double, paragraphCount count: Int) -> Int {
+        guard count > 1 else { return 1 }
+        let clamped = min(max(progression, 0), 1)
+        let zeroBased = min(Int(clamped * Double(count)), count - 1)   // floor, matching the forward map
+        return zeroBased + 1
+    }
 }
