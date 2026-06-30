@@ -14,6 +14,8 @@ struct SettingsView: View {
     @State private var copied = false
     @State private var openAIKey = ""
     @State private var openAIKeySaved = false
+    @State private var elevenLabsKey = ""
+    @State private var elevenLabsKeySaved = false
 
     var body: some View {
         NavigationStack {
@@ -51,6 +53,19 @@ struct SettingsView: View {
                             .autocorrectionDisabled()
                         Button(openAIKeySaved ? "Update Key" : "Save Key") { saveOpenAIKey() }
                             .disabled(openAIKey.trimmingCharacters(in: .whitespaces).isEmpty)
+                    }
+                    if container.readerSettings.settings.ttsProvider == .elevenlabs {
+                        Picker("ElevenLabs voice", selection: Binding(
+                            get: { container.readerSettings.settings.elevenLabsVoiceID },
+                            set: { container.readerSettings.settings.elevenLabsVoiceID = $0 }
+                        )) {
+                            ForEach(ElevenLabsSpeechEngine.voices, id: \.id) { Text($0.name).tag($0.id) }
+                        }
+                        SecureField(elevenLabsKeySaved ? "API key saved — enter to replace" : "ElevenLabs API key", text: $elevenLabsKey)
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled()
+                        Button(elevenLabsKeySaved ? "Update Key" : "Save Key") { saveElevenLabsKey() }
+                            .disabled(elevenLabsKey.trimmingCharacters(in: .whitespaces).isEmpty)
                     }
                 } header: {
                     Text("Voice")
@@ -105,6 +120,7 @@ struct SettingsView: View {
             .onAppear {
                 key = container.keyAuth.currentKey()
                 openAIKeySaved = KeychainHelper.hasKey(account: KeychainHelper.Account.openAI)
+                elevenLabsKeySaved = KeychainHelper.hasKey(account: KeychainHelper.Account.elevenLabs)
             }
         }
     }
@@ -113,6 +129,12 @@ struct SettingsView: View {
         KeychainHelper.save(openAIKey, account: KeychainHelper.Account.openAI)
         openAIKeySaved = KeychainHelper.hasKey(account: KeychainHelper.Account.openAI)
         openAIKey = ""
+    }
+
+    private func saveElevenLabsKey() {
+        KeychainHelper.save(elevenLabsKey, account: KeychainHelper.Account.elevenLabs)
+        elevenLabsKeySaved = KeychainHelper.hasKey(account: KeychainHelper.Account.elevenLabs)
+        elevenLabsKey = ""
     }
 
     private func copyKey() {

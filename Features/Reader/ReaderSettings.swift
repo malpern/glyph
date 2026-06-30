@@ -15,6 +15,8 @@ struct ReaderSettings: Codable, Equatable, Sendable {
     var ttsProvider: TTSProvider = .apple
     /// Selected OpenAI voice (one of `OpenAISpeechEngine.voices`).
     var openAIVoice: String = "onyx"
+    /// Selected ElevenLabs voice id.
+    var elevenLabsVoiceID: String = "21m00Tcm4TlvDq8ikWAM"   // Rachel
 
     var epubPreferences: EPUBPreferences {
         EPUBPreferences(
@@ -40,17 +42,19 @@ struct ReaderSettings: Codable, Equatable, Sendable {
         highlightGranularity = try c.decodeIfPresent(HighlightGranularity.self, forKey: .highlightGranularity) ?? .sentence
         ttsProvider = try c.decodeIfPresent(TTSProvider.self, forKey: .ttsProvider) ?? .apple
         openAIVoice = try c.decodeIfPresent(String.self, forKey: .openAIVoice) ?? "onyx"
+        elevenLabsVoiceID = try c.decodeIfPresent(String.self, forKey: .elevenLabsVoiceID) ?? "21m00Tcm4TlvDq8ikWAM"
     }
 }
 
 /// The TTS engine that reads aloud. Cloud providers need an API key (Keychain);
 /// without one they fall back to Apple.
 enum TTSProvider: String, Codable, CaseIterable, Sendable {
-    case apple, openai
+    case apple, openai, elevenlabs
     var label: String {
         switch self {
         case .apple: return "Apple"
         case .openai: return "OpenAI"
+        case .elevenlabs: return "ElevenLabs"
         }
     }
 }
