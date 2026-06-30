@@ -22,6 +22,7 @@ struct TableOfContentsView: View {
                         List(entries) { entry in
                             Button { onSelect(entry); dismiss() } label: { row(entry) }
                                 .id(entry.id)
+                                .accessibilityAddTraits(entry.id == currentID ? [.isSelected] : [])
                         }
                         .onAppear {
                             guard let currentID else { return }
@@ -34,6 +35,7 @@ struct TableOfContentsView: View {
             .navigationBarTitleDisplayMode(.inline)
         }
         .presentationDetents([.medium, .large])
+        .presentationDragIndicator(.visible)
     }
 
     @ViewBuilder private func row(_ entry: TOCEntry) -> some View {
@@ -48,6 +50,7 @@ struct TableOfContentsView: View {
                 Image(systemName: "checkmark")
                     .font(.footnote.weight(.semibold))
                     .foregroundStyle(Color.accentColor)
+                    .accessibilityHidden(true)   // the .isSelected trait conveys this to VoiceOver
             }
         }
         .contentShape(Rectangle())

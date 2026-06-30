@@ -8,6 +8,7 @@ struct ReaderContainerView: View {
     @State private var viewModel: ReaderViewModel
     @Environment(\.dismiss) private var dismiss
     @Environment(AppContainer.self) private var container
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var showChrome = true
     @State private var showingSettings = false
     @State private var showingBookmarks = false
@@ -29,8 +30,9 @@ struct ReaderContainerView: View {
     var body: some View {
         NavigationStack {
             content
-                .navigationTitle(viewModel.book.title)
-                .navigationBarTitleDisplayMode(.inline)
+                // No inline title: a single immersive reading view doesn't need the book
+                // title permanently in the bar, and dropping it reclaims the width the
+                // controls were colliding over.
                 .toolbar {
                     ToolbarItem(placement: .topBarLeading) {
                         Button("Close", systemImage: "chevron.left") { close() }
@@ -42,29 +44,6 @@ struct ReaderContainerView: View {
                         .accessibilityLabel("Table of contents")
                     }
                     ToolbarItem(placement: .topBarTrailing) {
-                        Button { showingSettings = true } label: {
-                            Image(systemName: "textformat.size")
-                        }
-                        .accessibilityLabel("Reading settings")
-                    }
-                    ToolbarItem(placement: .topBarTrailing) {
-                        Button { showingBookmarks = true } label: {
-                            Image(systemName: "bookmark")
-                        }
-                        .accessibilityLabel("Bookmarks")
-                    }
-                    ToolbarItem(placement: .topBarTrailing) {
-                        if let remote = viewModel.remoteSession {
-                            Button {
-                                remote.toggle()
-                            } label: {
-                                Image(systemName: "dot.radiowaves.left.and.right")
-                                    .foregroundStyle(remoteTint(remote.connectionState, active: remote.isActive))
-                            }
-                            .accessibilityLabel(remote.isActive ? "Stop X4 session" : "Connect X4")
-                        }
-                    }
-                    ToolbarItem(placement: .topBarTrailing) {
                         if let speech = viewModel.speech {
                             Button {
                                 Task { await viewModel.toggleSpeech() }
@@ -73,6 +52,28 @@ struct ReaderContainerView: View {
                             }
                             .accessibilityLabel(speech.isPlaying ? "Pause read-aloud" : "Read aloud")
                         }
+                    }
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Menu {
+                            Button { showingSettings = true } label: {
+                                Label("Reading Settings", systemImage: "textformat.size")
+                            }
+                            Button { showingBookmarks = true } label: {
+                                Label("Bookmarks & Highlights", systemImage: "bookmark")
+                            }
+                            if let remote = viewModel.remoteSession {
+                                Button { remote.toggle() } label: {
+                                    Label(remote.isActive ? "Stop X4 Session" : "Connect X4",
+                                          systemImage: "dot.radiowaves.left.and.right")
+                                }
+                            }
+                        } label: {
+                            Image(systemName: "ellipsis")
+                        }
+                        // Tint the overflow when an X4 session is live, so its connection
+                        // state stays glanceable without a dedicated toolbar button.
+                        .tint(remoteMenuTint)
+                        .accessibilityLabel("More")
                     }
                 }
                 // Native Liquid Glass nav bar that auto-hides for distraction-free
@@ -160,7 +161,7 @@ struct ReaderContainerView: View {
                 ttsFollow: tts.follow,
                 highlights: viewModel.highlightDecorations,
                 onLocationChange: { viewModel.locationChanged($0) },
-                onTap: { withAnimation(.easeInOut(duration: 0.2)) { showChrome.toggle() } },
+                onTap: { withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.2)) { showChrome.toggle() } },
                 onHighlightSelected: { locator in Task { await viewModel.createHighlight(at: locator) } },
                 onHighlightTapped: { id in tappedHighlightID = UUID(uuidString: id) }
             )
@@ -168,9 +169,11 @@ struct ReaderContainerView: View {
         }
     }
 
-    private func remoteTint(_ state: X4Client.ConnectionState, active: Bool) -> Color {
-        guard active else { return .secondary }
-        switch state {
+    /// Overflow-menu tint reflecting the X4 connection state while a session is active,
+    /// or `nil` (default glass tint) when no session is running.
+    private var remoteMenuTint: Color? {
+        guard let remote = viewModel.remoteSession, remote.isActive else { return nil }
+        switch remote.connectionState {
         case .connected: return .green
         case .connecting: return .yellow
         case .failed: return .red

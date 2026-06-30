@@ -20,9 +20,12 @@ struct ReaderSettingsView: View {
                     HStack(spacing: 16) {
                         Button { adjustFont(-0.1) } label: { Text("A").font(.footnote) }
                             .buttonStyle(.bordered)
+                            .accessibilityLabel("Decrease text size")
                         Slider(value: $store.settings.fontScale, in: 0.8...2.0, step: 0.1)
+                            .accessibilityValue("\(Int(store.settings.fontScale * 100)) percent")
                         Button { adjustFont(0.1) } label: { Text("A").font(.title2) }
                             .buttonStyle(.bordered)
+                            .accessibilityLabel("Increase text size")
                     }
                     Text("\(Int(store.settings.fontScale * 100))%")
                         .font(.footnote).foregroundStyle(.secondary)
@@ -85,6 +88,7 @@ struct ReaderSettingsView: View {
             }
         }
         .presentationDetents([.medium, .large])
+        .presentationDragIndicator(.visible)
     }
 
     private func adjustFont(_ delta: Double) {

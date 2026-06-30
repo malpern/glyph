@@ -7,11 +7,15 @@ import ReaderCore
 /// lists support tap-to-jump and swipe-to-delete, driven by `ReaderViewModel`.
 struct AnnotationsView: View {
     let viewModel: ReaderViewModel
-    var initialTab: Tab = .bookmarks
     @Environment(\.dismiss) private var dismiss
-    @State private var tab: Tab = .bookmarks
+    @State private var tab: Tab
 
     enum Tab: String, CaseIterable { case bookmarks = "Bookmarks", highlights = "Highlights" }
+
+    init(viewModel: ReaderViewModel, initialTab: Tab = .bookmarks) {
+        self.viewModel = viewModel
+        _tab = State(initialValue: initialTab)   // seed at init, not in onAppear (no flash)
+    }
 
     var body: some View {
         NavigationStack {
@@ -27,9 +31,8 @@ struct AnnotationsView: View {
                 case .highlights: highlightsList
                 }
             }
-            .navigationTitle(tab.rawValue)
+            .navigationTitle("Annotations")
             .navigationBarTitleDisplayMode(.inline)
-            .onAppear { tab = initialTab }
             .toolbar {
                 if tab == .bookmarks {
                     ToolbarItem(placement: .topBarLeading) {
@@ -42,6 +45,7 @@ struct AnnotationsView: View {
             }
         }
         .presentationDetents([.medium, .large])
+        .presentationDragIndicator(.visible)
     }
 
     @ViewBuilder private var bookmarksList: some View {
@@ -49,7 +53,7 @@ struct AnnotationsView: View {
             if viewModel.bookmarks.isEmpty {
                 ContentUnavailableView(
                     "No Bookmarks", systemImage: "bookmark",
-                    description: Text("Tap ➕ to bookmark the page you're on.")
+                    description: Text("Tap Add bookmark to save the page you're on.")
                 )
             } else {
                 ForEach(viewModel.bookmarks.reversed()) { bookmark in
@@ -124,12 +128,15 @@ private struct BookmarkRow: View {
 private struct HighlightRow: View {
     let highlight: Highlight
 
+    private var color: HighlightColor { HighlightColor.from(highlight.color) }
+
     var body: some View {
         HStack(alignment: .top, spacing: 10) {
             Circle()
-                .fill(Color(HighlightColor.from(highlight.color).uiColor))
+                .fill(Color(color.uiColor))
                 .frame(width: 12, height: 12)
                 .padding(.top, 4)
+                .accessibilityHidden(true)   // color is named in the combined label below
             VStack(alignment: .leading, spacing: 3) {
                 Text(highlight.text ?? "Highlight")
                     .font(.body)
@@ -140,5 +147,8 @@ private struct HighlightRow: View {
             }
         }
         .padding(.vertical, 2)
+        // Convey the highlight color to VoiceOver — the swatch alone doesn't.
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(color.label) highlight: \(highlight.text ?? "")")
     }
 }
