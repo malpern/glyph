@@ -11,6 +11,7 @@ struct ReaderContainerView: View {
     @State private var showChrome = true
     @State private var showingSettings = false
     @State private var showingBookmarks = false
+    @State private var showingTOC = false
     @State private var annotationsTab: AnnotationsView.Tab = .bookmarks
     @State private var tappedHighlightID: UUID?
 
@@ -33,6 +34,14 @@ struct ReaderContainerView: View {
                 .toolbar {
                     ToolbarItem(placement: .topBarLeading) {
                         Button("Close", systemImage: "chevron.left") { close() }
+                    }
+                    ToolbarItem(placement: .topBarLeading) {
+                        if !viewModel.tableOfContents.isEmpty {
+                            Button { showingTOC = true } label: {
+                                Image(systemName: "list.bullet")
+                            }
+                            .accessibilityLabel("Table of contents")
+                        }
                     }
                     ToolbarItem(placement: .topBarTrailing) {
                         Button { showingSettings = true } label: {
@@ -77,6 +86,13 @@ struct ReaderContainerView: View {
                 }
                 .sheet(isPresented: $showingBookmarks) {
                     AnnotationsView(viewModel: viewModel, initialTab: annotationsTab)
+                }
+                .sheet(isPresented: $showingTOC) {
+                    TableOfContentsView(
+                        entries: viewModel.tableOfContents,
+                        currentID: viewModel.currentTOCID,
+                        onSelect: { viewModel.jump(toTOC: $0) }
+                    )
                 }
                 .confirmationDialog(
                     "Highlight",

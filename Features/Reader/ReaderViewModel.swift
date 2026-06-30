@@ -37,6 +37,8 @@ final class ReaderViewModel {
     private(set) var bookmarks: [Bookmark] = []
     /// Highlights for this book (live; oldest first). Loaded on `load()`.
     private(set) var highlights: [Highlight] = []
+    /// Flattened, depth-tagged table of contents for the Contents sheet. Loaded on `load()`.
+    private(set) var tableOfContents: [TOCEntry] = []
     /// One-shot navigator jump (tapping a bookmark). The token makes repeated jumps to
     /// the same locator distinct, so the navigator re-navigates each tap.
     private(set) var pendingJump: JumpRequest?
@@ -66,6 +68,9 @@ final class ReaderViewModel {
             if let initialLocator { currentSpineIndex = spineIndex(for: initialLocator) ?? 0 }
             bookmarks = (try? await readingState.bookmarks(bookID: book.id)) ?? []
             highlights = (try? await readingState.highlights(bookID: book.id)) ?? []
+            // TOC flattening happens in the nonisolated ReadiumStack helper so the
+            // non-Sendable `Publication` never crosses into this @MainActor type.
+            tableOfContents = (try? await ReadiumStack.tableOfContents(at: fileURL)) ?? []
             let engine = SpeechEngineFactory.make(from: settingsStore?.settings ?? ReaderSettings())
             let speechController = SpeechController(
                 content: SpineContentProvider(fileURL: fileURL),
@@ -147,6 +152,34 @@ final class ReaderViewModel {
     private func reloadBookmarks() async {
         bookmarks = (try? await readingState.bookmarks(bookID: book.id)) ?? []
     }
+
+    // MARK: Table of contents
+
+    /// The TOC entry the reader is currently inside — the deepest entry at or before the
+    /// current position (by spine, then progression). Drives the "you are here" highlight.
+    var currentTOCID: TOCEntry.ID? {
+        let curSpine = currentSpineIndex
+        let curProgression = latestLocator?.locations.progression ?? 0
+        var best: TOCEntry?
+        var bestKey = (-1, -1.0)
+        for entry in tableOfContents {
+            guard let spine = entry.spineIndex else { continue }
+            let progression = entry.locator?.locations.progression ?? 0
+            // Entry is at or before where we're reading?
+            guard spine < curSpine || (spine == curSpine && progression <= curProgression + 0.0001)
+            else { continue }
+            if (spine, progression) > bestKey { bestKey = (spine, progression); best = entry }
+        }
+        return best?.id
+    }
+
+    /// Jump the navigator to a table-of-contents entry.
+    func jump(toTOC entry: TOCEntry) {
+        guard let locator = entry.locator else { return }
+        jumpToken += 1
+        pendingJump = JumpRequest(locator: locator, token: jumpToken)
+    }
+
 
     // MARK: Highlights
 
@@ -309,4 +342,14 @@ final class ReaderViewModel {
         try? await readingState.updateLocator(bookID: book.id, locator: data)
         await syncEngine?.pushDirty()   // propagate to other devices promptly
     }
+}
+
+/// One row of the table of contents: a title at a nesting `depth`, the `Locator` to jump
+/// to, and the spine index it lands in (for the current-section highlight).
+struct TOCEntry: Identifiable, Equatable, Sendable {
+    let id = UUID()
+    let title: String
+    let depth: Int
+    let locator: Locator?
+    let spineIndex: Int?
 }

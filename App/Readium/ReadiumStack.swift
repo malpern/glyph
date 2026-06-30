@@ -75,6 +75,36 @@ enum ReadiumStack {
         return SpineParser.paragraphs(fromHTML: data)
     }
 
+    /// Flatten the table of contents into Sendable, depth-tagged `TOCEntry`s — each with a
+    /// `Locator` to jump to and the spine index it lands in (for the current-section
+    /// highlight). Done in this nonisolated function so the non-Sendable `Publication`
+    /// never crosses an isolation domain; only the `Sendable` `[TOCEntry]` is returned. A
+    /// title-less node isn't shown but its children fold up to its own depth.
+    static func tableOfContents(at url: URL) async throws -> [TOCEntry] {
+        let publication = try await makePublication(at: url)
+        let readingOrder = publication.readingOrder
+        func spineIndex(for locator: Locator) -> Int? {
+            readingOrder.firstIndex { locator.href.isEquivalentTo($0.url()) }
+        }
+        let links = (try? await publication.tableOfContents().get()) ?? []
+        var entries: [TOCEntry] = []
+        var stack = links.reversed().map { (link: $0, depth: 0) }
+        while let (link, depth) = stack.popLast() {
+            let title = link.title?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            var childDepth = depth
+            if !title.isEmpty {
+                let locator = await publication.locate(link)
+                entries.append(TOCEntry(
+                    title: title, depth: depth,
+                    locator: locator, spineIndex: locator.flatMap { spineIndex(for: $0) }
+                ))
+                childDepth = depth + 1
+            }
+            stack.append(contentsOf: link.children.reversed().map { (link: $0, depth: childDepth) })
+        }
+        return entries
+    }
+
     private static func makePublication(at url: URL) async throws -> Publication {
         let http = DefaultHTTPClient()
         let assetRetriever = AssetRetriever(httpClient: http)
