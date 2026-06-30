@@ -28,6 +28,12 @@ requests) is preserved verbatim at the bottom as the canonical contract referenc
   Paragraph/Page the follow target only changes per paragraph, so the page turns at most
   once per paragraph (fixes per-sentence follow jumpiness). `RemoteCommand.highlight`'s
   `sentence` is now optional. See `HighlightGranularity`, `RemoteSessionController`.
+- **Bookmarks & highlights.** Bookmark the current page; select text → **Highlight** (4
+  colours); both listed in one **Annotations** sheet (Bookmarks | Highlights) with
+  tap-to-jump + swipe-to-delete; tap a highlight to recolour/delete. Persisted via SwiftData
+  behind `ReadingStateRepository` (each record carries its own `updatedAt`/`deletedAt`, so
+  sync is a drop-in later). Highlights render via a `highlights` decoration group. See
+  `AnnotationsView`, `HighlightStyle`, `ReaderHostController`, `ReaderViewModel`.
 - **Deploy pipeline.** `fastlane` lanes (`beta`, `register_app_id`, `add_internal_tester`,
   `tf_status`) — autonomous build → TestFlight via the App Store Connect API key. Live on
   TestFlight as **"Glyph: Read & Listen"** (`dev.malpern.Glyph`). Apple capability +
@@ -37,13 +43,14 @@ requests) is preserved verbatim at the bottom as the canonical contract referenc
 
 1. **X4 real-device end-to-end test** (page-follow + sentence highlight + position bridge,
    across all three granularities). Gated on hardware. (Task X4.)
-2. **Follow refinement (optional).** Paragraph/Page cadence already removes most
+2. **Sync bookmarks & highlights.** The records are sync-ready (id + `updatedAt`/`deletedAt`);
+   extend the engine (or add parallel ones) + Firestore collections so annotations follow
+   the same cross-device path as reading position.
+3. **Follow refinement (optional).** Paragraph/Page cadence already removes most
    per-sentence jumpiness. A further nicety: suppress auto-follow briefly after a *manual*
    page turn (so re-reading isn't yanked), or only re-center when the unit is off-screen.
-3. **Reverse-resume**: open the X4 → it jumps to the phone's newer cloud position. Gated on
+4. **Reverse-resume**: open the X4 → it jumps to the phone's newer cloud position. Gated on
    the firmware adding a freshness marker to `ready` so the phone knows whose position wins.
-4. **Bookmarks & highlights** — persisted locally and synced through the existing
-   `ReadingStateSyncEngine` (same envelope: `updatedAt` / `deletedAt` / `pendingSync`).
 5. **Release-build optimization.** Currently archived with `SWIFT_OPTIMIZATION_LEVEL=-Onone`
    to dodge a Swift optimizer crash compiling SwiftSoup (a Readium dep) in Release.
    Confirmed present in **both Xcode 27 beta 1 (27A5194q) and beta 2 (27A5209h)**; `singlefile`
