@@ -39,17 +39,6 @@ struct ReaderSettingsView: View {
                     }
                     .pickerStyle(.inline)
                 }
-
-                Section {
-                    Picker("Highlight", selection: $store.settings.highlightGranularity) {
-                        ForEach(HighlightGranularity.allCases, id: \.self) { Text($0.label).tag($0) }
-                    }
-                    .pickerStyle(.segmented)
-                } header: {
-                    Text("Read-aloud")
-                } footer: {
-                    Text("How the spoken position is highlighted and followed — and how often the X4 e-ink screen refreshes. Paragraph is calmer; Sentence is best for active read-along.")
-                }
             }
             .navigationTitle("Reading")
             .navigationBarTitleDisplayMode(.inline)

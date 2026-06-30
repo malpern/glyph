@@ -9,7 +9,7 @@ struct LibraryView: View {
     @Environment(AppContainer.self) private var container
 
     @State private var showingFileImporter = false
-    @State private var showingSync = false
+    @State private var showingSettings = false
     @State private var openedBook: Book?
 
     private let columns = [GridItem(.adaptive(minimum: 104, maximum: 150), spacing: 24, alignment: .top)]
@@ -27,11 +27,11 @@ struct LibraryView: View {
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button {
-                        showingSync = true
+                        showingSettings = true
                     } label: {
-                        Image(systemName: "arrow.triangle.2.circlepath")
+                        Image(systemName: "gearshape")
                     }
-                    .accessibilityLabel("Sync settings")
+                    .accessibilityLabel("Settings")
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
@@ -42,7 +42,7 @@ struct LibraryView: View {
                     .accessibilityLabel("Import book")
                 }
             }
-            .sheet(isPresented: $showingSync) { SyncSettingsView() }
+            .sheet(isPresented: $showingSettings) { SettingsView() }
             .fullScreenCover(item: $openedBook) { book in
                 ReaderContainerView(
                     book: book,

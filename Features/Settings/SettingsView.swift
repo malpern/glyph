@@ -2,10 +2,10 @@ import SwiftUI
 import CoreImage.CIFilterBuiltins
 import UIKit
 
-/// Minimal sync screen: show this device's key (copy / QR) to bring other devices
-/// onto the same account, or paste another device's key to join it. No passwords,
-/// no email — the key is the whole credential.
-struct SyncSettingsView: View {
+/// App settings: read-aloud granularity, plus sync — show this device's key (copy /
+/// QR) to bring other devices onto the same account, or paste another device's key to
+/// join it. No passwords, no email — the key is the whole credential.
+struct SettingsView: View {
     @Environment(AppContainer.self) private var container
     @Environment(\.dismiss) private var dismiss
 
@@ -16,6 +16,20 @@ struct SyncSettingsView: View {
     var body: some View {
         NavigationStack {
             Form {
+                Section {
+                    Picker("Highlight", selection: Binding(
+                        get: { container.readerSettings.settings.highlightGranularity },
+                        set: { container.readerSettings.settings.highlightGranularity = $0 }
+                    )) {
+                        ForEach(HighlightGranularity.allCases, id: \.self) { Text($0.label).tag($0) }
+                    }
+                    .pickerStyle(.segmented)
+                } header: {
+                    Text("Read-aloud")
+                } footer: {
+                    Text("How the spoken position is highlighted and followed — and how often the X4 e-ink screen refreshes. Paragraph is calmer; Sentence is best for active read-along.")
+                }
+
                 Section {
                     Text(SyncKey.grouped(key))
                         .font(.system(.body, design: .monospaced))
@@ -53,7 +67,7 @@ struct SyncSettingsView: View {
                     Text("Replaces this device's key so it joins that account.")
                 }
             }
-            .navigationTitle("Sync")
+            .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
