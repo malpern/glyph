@@ -102,6 +102,16 @@ enum ReadiumStack {
             }
             stack.append(contentsOf: link.children.reversed().map { (link: $0, depth: childDepth) })
         }
+        // Fallback for books with no navigation document (e.g. some scanned/course EPUBs):
+        // list the reading-order items so the reader can still jump between sections.
+        if entries.isEmpty, readingOrder.count > 1 {
+            for (index, link) in readingOrder.enumerated() {
+                let title = link.title?.trimmingCharacters(in: .whitespacesAndNewlines)
+                let label = (title?.isEmpty == false) ? title! : "Section \(index + 1)"
+                let locator = await publication.locate(link)
+                entries.append(TOCEntry(title: label, depth: 0, locator: locator, spineIndex: index))
+            }
+        }
         return entries
     }
 

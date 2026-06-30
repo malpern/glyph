@@ -36,12 +36,10 @@ struct ReaderContainerView: View {
                         Button("Close", systemImage: "chevron.left") { close() }
                     }
                     ToolbarItem(placement: .topBarLeading) {
-                        if !viewModel.tableOfContents.isEmpty {
-                            Button { showingTOC = true } label: {
-                                Image(systemName: "list.bullet")
-                            }
-                            .accessibilityLabel("Table of contents")
+                        Button { showingTOC = true } label: {
+                            Image(systemName: "list.bullet")
                         }
+                        .accessibilityLabel("Table of contents")
                     }
                     ToolbarItem(placement: .topBarTrailing) {
                         Button { showingSettings = true } label: {
