@@ -33,6 +33,12 @@ final class ReaderViewModel {
     private var currentSpineIndex = 0
     /// App-wide reader settings (read-aloud granularity). Attached before `load()`.
     private var settingsStore: ReaderSettingsStore?
+    /// Bookmarks for this book (live; oldest first). Loaded on `load()`.
+    private(set) var bookmarks: [Bookmark] = []
+    /// One-shot navigator jump (tapping a bookmark). The token makes repeated jumps to
+    /// the same locator distinct, so the navigator re-navigates each tap.
+    private(set) var pendingJump: JumpRequest?
+    private var jumpToken = 0
 
     init(
         book: Book,
@@ -54,7 +60,9 @@ final class ReaderViewModel {
             let publication = try await ReadiumStack.open(at: fileURL)
             self.publication = publication
             let initialLocator = await restoredLocator()
+            latestLocator = initialLocator   // a valid "current page" before the first move
             if let initialLocator { currentSpineIndex = spineIndex(for: initialLocator) ?? 0 }
+            bookmarks = (try? await readingState.bookmarks(bookID: book.id)) ?? []
             let speechController = SpeechController(
                 content: SpineContentProvider(fileURL: fileURL),
                 bookTitle: book.title
@@ -105,6 +113,31 @@ final class ReaderViewModel {
             let l = locator(sentence.paragraphText, before: nil, after: nil)
             return (nil, l)
         }
+    }
+
+    // MARK: Bookmarks
+
+    /// Bookmark the current page.
+    func addBookmark() async {
+        guard let locator = latestLocator, let data = LocatorCoding.data(from: locator) else { return }
+        try? await readingState.addBookmark(Bookmark(bookID: book.id, locator: data))
+        await reloadBookmarks()
+    }
+
+    func deleteBookmark(_ id: UUID) async {
+        try? await readingState.deleteBookmark(id: id)
+        await reloadBookmarks()
+    }
+
+    /// Jump the navigator to a bookmark's saved position.
+    func jump(to bookmark: Bookmark) {
+        guard let locator = LocatorCoding.locator(from: bookmark.locator) else { return }
+        jumpToken += 1
+        pendingJump = JumpRequest(locator: locator, token: jumpToken)
+    }
+
+    private func reloadBookmarks() async {
+        bookmarks = (try? await readingState.bookmarks(bookID: book.id)) ?? []
     }
 
     /// Start / pause / resume read-aloud, beginning at the page on screen.

@@ -3,6 +3,13 @@ import UIKit
 import ReadiumNavigator
 import ReadiumShared
 
+/// A one-shot request to navigate the reader to a locator (tapping a bookmark). The
+/// `token` makes repeated jumps to the same locator distinct so each tap re-navigates.
+struct JumpRequest: Equatable {
+    let locator: Locator
+    let token: Int
+}
+
 /// The bridge to Readium's `EPUBNavigatorViewController` — the one sanctioned use
 /// of UIKit. We wrap the navigator rather than reimplement it: its WebView-based
 /// pagination, theming, and locator mapping are exactly what we don't want to
@@ -12,6 +19,8 @@ struct EPUBReaderView: UIViewControllerRepresentable {
     let initialLocator: Locator?
     /// Appearance (theme/font/size/spacing); applied live as it changes.
     let preferences: EPUBPreferences
+    /// A one-shot jump (bookmark tap); the navigator goes to it when it changes.
+    let pendingJump: JumpRequest?
     /// The read-aloud unit to highlight on screen (`nil` clears it — e.g. page mode).
     let ttsHighlight: Locator?
     /// The locator to keep on screen as read-aloud advances (page-follow); `nil` when
@@ -71,6 +80,14 @@ struct EPUBReaderView: UIViewControllerRepresentable {
                 Task { await navigator.go(to: locator, options: NavigatorGoOptions(animated: false)) }
             }
         }
+
+        // One-shot jump to a bookmark.
+        if context.coordinator.lastJump != pendingJump {
+            context.coordinator.lastJump = pendingJump
+            if let jump = pendingJump {
+                Task { await navigator.go(to: jump.locator, options: NavigatorGoOptions(animated: true)) }
+            }
+        }
     }
 
     /// DEBUG-only: turn N pages after load so headless simulator runs can exercise
@@ -95,6 +112,7 @@ struct EPUBReaderView: UIViewControllerRepresentable {
         var lastPreferences: EPUBPreferences?
         var lastHighlight: Locator?
         var lastFollow: Locator?
+        var lastJump: JumpRequest?
 
         init(onLocationChange: @escaping (Locator) -> Void, onTap: @escaping () -> Void) {
             self.onLocationChange = onLocationChange

@@ -10,6 +10,7 @@ struct ReaderContainerView: View {
     @Environment(AppContainer.self) private var container
     @State private var showChrome = true
     @State private var showingSettings = false
+    @State private var showingBookmarks = false
 
     init(
         book: Book,
@@ -36,6 +37,12 @@ struct ReaderContainerView: View {
                             Image(systemName: "textformat.size")
                         }
                         .accessibilityLabel("Reading settings")
+                    }
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button { showingBookmarks = true } label: {
+                            Image(systemName: "bookmark")
+                        }
+                        .accessibilityLabel("Bookmarks")
                     }
                     ToolbarItem(placement: .topBarTrailing) {
                         if let remote = viewModel.remoteSession {
@@ -66,6 +73,9 @@ struct ReaderContainerView: View {
                 .sheet(isPresented: $showingSettings) {
                     ReaderSettingsView(store: container.readerSettings)
                 }
+                .sheet(isPresented: $showingBookmarks) {
+                    BookmarksView(viewModel: viewModel)
+                }
         }
         .task {
             viewModel.attach(settings: container.readerSettings)
@@ -74,6 +84,11 @@ struct ReaderContainerView: View {
             let env = ProcessInfo.processInfo.environment
             if env["READER_AUTOREMOTE"] == "1" { viewModel.remoteSession?.start() }
             if env["READER_AUTOSPEAK"] == "1" { await viewModel.toggleSpeech() }
+            if env["READER_AUTOBOOKMARK"] == "1" {
+                try? await Task.sleep(for: .seconds(3))   // let the first locationDidChange land
+                await viewModel.addBookmark()
+                showingBookmarks = true
+            }
             #endif
         }
     }
@@ -93,6 +108,7 @@ struct ReaderContainerView: View {
                 publication: publication,
                 initialLocator: initialLocator,
                 preferences: container.readerSettings.epubPreferences,
+                pendingJump: viewModel.pendingJump,
                 ttsHighlight: tts.highlight,
                 ttsFollow: tts.follow,
                 onLocationChange: { viewModel.locationChanged($0) },
