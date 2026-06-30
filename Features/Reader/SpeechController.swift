@@ -47,7 +47,7 @@ final class SpeechController {
     var onPositionChange: ((_ spine: Int, _ paragraph: Int, _ sentence: Int, _ paragraphChanged: Bool) -> Void)?
 
     private let content: SpineContentProvider
-    private let engine: SpeechEngine
+    private var engine: SpeechEngine
     private let nowPlaying: NowPlayingController
     private var units: [Unit] = []
     private var index = 0
@@ -65,6 +65,17 @@ final class SpeechController {
         nowPlaying.onTogglePlayPause = { [weak self] in self?.togglePlayPause() }
         nowPlaying.onNext = { [weak self] in self?.nextSentence() }
         nowPlaying.onPrevious = { [weak self] in self?.previousSentence() }
+    }
+
+    /// Swap the TTS engine live (the user changed voice/provider). Re-speaks the current
+    /// sentence on the new voice if we were playing.
+    func setEngine(_ newEngine: SpeechEngine) {
+        let wasPlaying = isPlaying
+        engine.stop()
+        engine = newEngine
+        speaking = false
+        paused = false
+        if wasPlaying { speakCurrent() }
     }
 
     /// Stop speaking and remove the Now Playing entry / remote handlers.
@@ -165,6 +176,11 @@ final class SpeechController {
         onPositionChange?(spineIndex, unit.paragraph, unit.sentence, changed)
         publishSpokenSentence()
         updateNowPlaying()
+
+        // Warm the next sentence's audio while this one plays (hides cloud latency).
+        if units.indices.contains(index + 1) {
+            engine.prefetch(units[index + 1].text, rate: rate)
+        }
 
         #if DEBUG
         print("🔊 TTS spine=\(spineIndex) para=\(unit.paragraph) sent=\(unit.sentence): \(unit.text.prefix(48))")

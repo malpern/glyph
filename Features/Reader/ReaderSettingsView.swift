@@ -64,7 +64,7 @@ struct ReaderSettingsView: View {
                 } header: {
                     Text("Read-aloud")
                 } footer: {
-                    Text("Highlight granularity and the voice that reads aloud. OpenAI/ElevenLabs need an API key (Settings → TTS keys). A voice change applies on the next book you open.")
+                    Text("Highlight granularity and the voice that reads aloud. OpenAI/ElevenLabs need an API key (Settings → TTS keys), and fall back to Apple if the key's missing or a request fails. Voice changes apply right away.")
                 }
             }
             .navigationTitle("Reading")

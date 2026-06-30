@@ -12,12 +12,18 @@ enum SpeechEngineFactory {
             guard let key = KeychainHelper.read(account: KeychainHelper.Account.openAI), !key.isEmpty else {
                 return AppleSpeechEngine()   // not configured → fall back
             }
-            return OpenAISpeechEngine(apiKey: key, voice: settings.openAIVoice)
+            return FallbackSpeechEngine(
+                primary: OpenAISpeechEngine(apiKey: key, voice: settings.openAIVoice),
+                fallback: AppleSpeechEngine()
+            )
         case .elevenlabs:
             guard let key = KeychainHelper.read(account: KeychainHelper.Account.elevenLabs), !key.isEmpty else {
                 return AppleSpeechEngine()
             }
-            return ElevenLabsSpeechEngine(apiKey: key, voiceID: settings.elevenLabsVoiceID)
+            return FallbackSpeechEngine(
+                primary: ElevenLabsSpeechEngine(apiKey: key, voiceID: settings.elevenLabsVoiceID),
+                fallback: AppleSpeechEngine()
+            )
         }
     }
 }

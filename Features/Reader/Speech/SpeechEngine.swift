@@ -17,4 +17,11 @@ protocol SpeechEngine: AnyObject {
     func pause()
     func resume()
     func stop()
+    /// Optionally warm the next sentence's audio while the current one plays (cloud
+    /// engines override; on-device Apple ignores it).
+    func prefetch(_ text: String, rate: Float)
+}
+
+extension SpeechEngine {
+    func prefetch(_ text: String, rate: Float) {}
 }

@@ -116,6 +116,14 @@ struct ReaderContainerView: View {
             }
             #endif
         }
+        .onChange(of: ttsSignature) { _, _ in viewModel.rebuildSpeechEngine() }
+    }
+
+    /// Changes when the user picks a different TTS provider or voice — triggers a live
+    /// engine rebuild so the new voice applies without reopening the book.
+    private var ttsSignature: String {
+        let s = container.readerSettings.settings
+        return "\(s.ttsProvider.rawValue)|\(s.openAIVoice)|\(s.elevenLabsVoiceID)"
     }
 
     @ViewBuilder private var content: some View {

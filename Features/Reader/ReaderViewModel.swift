@@ -198,6 +198,12 @@ final class ReaderViewModel {
     }
     #endif
 
+    /// Apply a live TTS provider/voice change to the open session (rebuilds the engine).
+    func rebuildSpeechEngine() {
+        guard let settings = settingsStore?.settings else { return }
+        speech?.setEngine(SpeechEngineFactory.make(from: settings))
+    }
+
     /// Start / pause / resume read-aloud, beginning at the page on screen.
     func toggleSpeech() async {
         guard let speech else { return }
