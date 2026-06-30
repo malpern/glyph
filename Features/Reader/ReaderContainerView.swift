@@ -11,6 +11,8 @@ struct ReaderContainerView: View {
     @State private var showChrome = true
     @State private var showingSettings = false
     @State private var showingBookmarks = false
+    @State private var annotationsTab: AnnotationsView.Tab = .bookmarks
+    @State private var tappedHighlightID: UUID?
 
     init(
         book: Book,
@@ -74,7 +76,24 @@ struct ReaderContainerView: View {
                     ReaderSettingsView(store: container.readerSettings)
                 }
                 .sheet(isPresented: $showingBookmarks) {
-                    BookmarksView(viewModel: viewModel)
+                    AnnotationsView(viewModel: viewModel, initialTab: annotationsTab)
+                }
+                .confirmationDialog(
+                    "Highlight",
+                    isPresented: Binding(
+                        get: { tappedHighlightID != nil },
+                        set: { if !$0 { tappedHighlightID = nil } }
+                    ),
+                    presenting: tappedHighlightID
+                ) { id in
+                    ForEach(HighlightColor.allCases, id: \.self) { color in
+                        Button(color.label) {
+                            Task { await viewModel.recolorHighlight(id, to: color) }
+                        }
+                    }
+                    Button("Delete Highlight", role: .destructive) {
+                        Task { await viewModel.deleteHighlight(id) }
+                    }
                 }
         }
         .task {
@@ -87,6 +106,12 @@ struct ReaderContainerView: View {
             if env["READER_AUTOBOOKMARK"] == "1" {
                 try? await Task.sleep(for: .seconds(3))   // let the first locationDidChange land
                 await viewModel.addBookmark()
+                showingBookmarks = true
+            }
+            if let text = env["READER_AUTOHIGHLIGHT"] {
+                try? await Task.sleep(for: .seconds(4))    // settle on a text page first
+                await viewModel.debugCreateHighlight(text: text)
+                annotationsTab = .highlights
                 showingBookmarks = true
             }
             #endif
@@ -111,8 +136,11 @@ struct ReaderContainerView: View {
                 pendingJump: viewModel.pendingJump,
                 ttsHighlight: tts.highlight,
                 ttsFollow: tts.follow,
+                highlights: viewModel.highlightDecorations,
                 onLocationChange: { viewModel.locationChanged($0) },
-                onTap: { withAnimation(.easeInOut(duration: 0.2)) { showChrome.toggle() } }
+                onTap: { withAnimation(.easeInOut(duration: 0.2)) { showChrome.toggle() } },
+                onHighlightSelected: { locator in Task { await viewModel.createHighlight(at: locator) } },
+                onHighlightTapped: { id in tappedHighlightID = UUID(uuidString: id) }
             )
             .ignoresSafeArea()
         }

@@ -35,6 +35,8 @@ final class ReaderViewModel {
     private var settingsStore: ReaderSettingsStore?
     /// Bookmarks for this book (live; oldest first). Loaded on `load()`.
     private(set) var bookmarks: [Bookmark] = []
+    /// Highlights for this book (live; oldest first). Loaded on `load()`.
+    private(set) var highlights: [Highlight] = []
     /// One-shot navigator jump (tapping a bookmark). The token makes repeated jumps to
     /// the same locator distinct, so the navigator re-navigates each tap.
     private(set) var pendingJump: JumpRequest?
@@ -63,6 +65,7 @@ final class ReaderViewModel {
             latestLocator = initialLocator   // a valid "current page" before the first move
             if let initialLocator { currentSpineIndex = spineIndex(for: initialLocator) ?? 0 }
             bookmarks = (try? await readingState.bookmarks(bookID: book.id)) ?? []
+            highlights = (try? await readingState.highlights(bookID: book.id)) ?? []
             let speechController = SpeechController(
                 content: SpineContentProvider(fileURL: fileURL),
                 bookTitle: book.title
@@ -139,6 +142,57 @@ final class ReaderViewModel {
     private func reloadBookmarks() async {
         bookmarks = (try? await readingState.bookmarks(bookID: book.id)) ?? []
     }
+
+    // MARK: Highlights
+
+    /// Saved highlights mapped to renderable decorations for the navigator.
+    var highlightDecorations: [HighlightDecoration] {
+        highlights.compactMap { h in
+            guard let locator = LocatorCoding.locator(from: h.locator) else { return nil }
+            return HighlightDecoration(id: h.id.uuidString, locator: locator, colorToken: h.color ?? "yellow")
+        }
+    }
+
+    /// Create a highlight from a text selection's locator.
+    func createHighlight(at locator: Locator, color: HighlightColor = .yellow) async {
+        guard let data = LocatorCoding.data(from: locator) else { return }
+        let highlight = Highlight(bookID: book.id, locator: data, text: locator.text.highlight, color: color.rawValue)
+        try? await readingState.addHighlight(highlight)
+        await reloadHighlights()
+    }
+
+    func deleteHighlight(_ id: UUID) async {
+        try? await readingState.deleteHighlight(id: id)
+        await reloadHighlights()
+    }
+
+    func recolorHighlight(_ id: UUID, to color: HighlightColor) async {
+        guard var highlight = highlights.first(where: { $0.id == id }) else { return }
+        highlight.color = color.rawValue
+        try? await readingState.updateHighlight(highlight)
+        await reloadHighlights()
+    }
+
+    /// Jump the navigator to a highlight's position.
+    func jump(to highlight: Highlight) {
+        guard let locator = LocatorCoding.locator(from: highlight.locator) else { return }
+        jumpToken += 1
+        pendingJump = JumpRequest(locator: locator, token: jumpToken)
+    }
+
+    private func reloadHighlights() async {
+        highlights = (try? await readingState.highlights(bookID: book.id)) ?? []
+    }
+
+    #if DEBUG
+    /// Create a highlight over `text` on the current page — lets headless simulator runs
+    /// exercise the render path without a real text selection.
+    func debugCreateHighlight(text: String) async {
+        guard let base = latestLocator else { return }
+        let locator = Locator(href: base.href, mediaType: base.mediaType, text: .init(highlight: text))
+        await createHighlight(at: locator)
+    }
+    #endif
 
     /// Start / pause / resume read-aloud, beginning at the page on screen.
     func toggleSpeech() async {
