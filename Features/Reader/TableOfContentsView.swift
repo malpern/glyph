@@ -32,9 +32,6 @@ struct TableOfContentsView: View {
             }
             .navigationTitle("Contents")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) { Button("Done") { dismiss() } }
-            }
         }
         .presentationDetents([.medium, .large])
     }
