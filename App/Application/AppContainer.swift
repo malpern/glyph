@@ -34,10 +34,16 @@ final class AppContainer {
         do {
             stack = (try ReaderStore.make(), try BookStorage())
         } catch {
-            // Last-resort fallback so the app still launches; a real build would
-            // surface this. Phase 1 keeps it simple.
+            // The on-disk store failed (corrupt/migration/disk) — fall back to an
+            // in-memory store so the app still launches (without persistence).
             assertionFailure("Failed to build persistent stack: \(error)")
-            stack = (try! ReaderStore.make(inMemory: true), try! BookStorage())
+            do {
+                stack = (try ReaderStore.make(inMemory: true), try BookStorage())
+            } catch {
+                // An in-memory store failing is unrecoverable; trap with a diagnosable
+                // message rather than a bare try! so crash reports are actionable.
+                fatalError("Glyph could not initialize storage (even in-memory): \(error)")
+            }
         }
         self.store = stack.store
         self.storage = stack.storage

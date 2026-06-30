@@ -6,6 +6,7 @@ import ReaderCore
 struct BookCard: View {
     let book: Book
     @Environment(AppContainer.self) private var container
+    @State private var coverImage: UIImage?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -28,16 +29,25 @@ struct BookCard: View {
             }
         }
         .multilineTextAlignment(.leading)
+        // Read the cover off the main thread, once per book — decoding it synchronously in
+        // `body` hitches grid scrolling.
+        .task(id: book.coverPath) { await loadCover() }
     }
 
     @ViewBuilder private var cover: some View {
-        if let path = book.coverPath,
-           let image = UIImage(contentsOfFile: container.storage.absoluteURL(for: path).path) {
-            Image(uiImage: image)
+        if let coverImage {
+            Image(uiImage: coverImage)
                 .resizable()
         } else {
             placeholder
         }
+    }
+
+    private func loadCover() async {
+        guard let path = book.coverPath else { coverImage = nil; return }
+        let url = container.storage.absoluteURL(for: path)
+        let data = await Task.detached(priority: .utility) { try? Data(contentsOf: url) }.value
+        coverImage = data.flatMap(UIImage.init(data:))
     }
 
     private var placeholder: some View {

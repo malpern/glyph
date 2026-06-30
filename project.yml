@@ -46,11 +46,21 @@ targets:
           - UIInterfaceOrientationPortraitUpsideDown
           - UIInterfaceOrientationLandscapeLeft
           - UIInterfaceOrientationLandscapeRight
+        # Single-window is deliberate: read-aloud + the X4 are one playback surface, so
+        # multiple Glyph windows fighting over one audio session would be confusing. The
+        # app still works in iPad Split View / Slide Over alongside other apps.
         UIApplicationSceneManifest:
           UIApplicationSupportsMultipleScenes: false
         # Lets users import .epub files from Files/other apps.
         UIFileSharingEnabled: true
         LSSupportsOpeningDocumentsInPlace: true
+        # Register as an EPUB handler so "Open with Glyph" / "Copy to Glyph" appears.
+        CFBundleDocumentTypes:
+          - CFBundleTypeName: EPUB Publication
+            LSHandlerRank: Alternate
+            LSItemContentTypes:
+              - org.idpf.epub-container
+              - public.epub
         # Keep read-aloud playing to AirPods when the screen locks / app backgrounds.
         UIBackgroundModes:
           - audio

@@ -32,6 +32,7 @@ final class RemoteSessionController {
     private var lastSent = 0
     private var reconnectTask: Task<Void, Never>?
     private var reconnectAttempt = 0
+    private var suspended = false   // app backgrounded: keep the session intent, stop the radio
 
     init(speech: SpeechController, granularity: @escaping () -> HighlightGranularity) {
         self.speech = speech
@@ -50,26 +51,47 @@ final class RemoteSessionController {
 
     func start() {
         isActive = true
+        suspended = false
         reconnectAttempt = 0
         client.connect()
     }
 
     func stop() {
         isActive = false
+        suspended = false
         reconnectTask?.cancel()
         reconnectTask = nil
         client.disconnect()
     }
 
+    /// App backgrounded: drop the socket and stop reconnecting so the X4 (a local-network
+    /// WebSocket, not covered by the audio background mode) doesn't churn the radio. The
+    /// `isActive` intent is kept; `resume()` reconnects on return to foreground. Read-aloud
+    /// audio is independent and keeps playing.
+    func suspend() {
+        guard isActive, !suspended else { return }
+        suspended = true
+        reconnectTask?.cancel()
+        reconnectTask = nil
+        client.disconnect()
+    }
+
+    func resume() {
+        guard isActive, suspended else { return }
+        suspended = false
+        reconnectAttempt = 0
+        client.connect()
+    }
+
     /// Retry the connection with capped exponential backoff while the session is active.
     private func scheduleReconnect() {
-        guard isActive else { return }
+        guard isActive, !suspended else { return }
         reconnectTask?.cancel()
         let delay = min(pow(2.0, Double(reconnectAttempt)), 10.0)   // 1, 2, 4, 8, 10, 10…
         reconnectAttempt += 1
         reconnectTask = Task { [weak self] in
             try? await Task.sleep(for: .seconds(delay))
-            guard !Task.isCancelled, let self, self.isActive else { return }
+            guard !Task.isCancelled, let self, self.isActive, !self.suspended else { return }
             self.client.connect()
         }
     }

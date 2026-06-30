@@ -7,6 +7,7 @@ import ReaderCore
 struct LibraryView: View {
     @State var viewModel: LibraryViewModel
     @Environment(AppContainer.self) private var container
+    @Environment(\.scenePhase) private var scenePhase
 
     @State private var showingFileImporter = false
     @State private var showingSettings = false
@@ -65,6 +66,10 @@ struct LibraryView: View {
                 await viewModel.load()
                 await viewModel.ingestInbox()
                 await runAutoDemoIfRequested()
+            }
+            .onChange(of: scenePhase) { _, phase in
+                // Catch an "Open with Glyph" that arrived while the app was already running.
+                if phase == .active { Task { await viewModel.ingestInbox() } }
             }
         }
     }

@@ -9,6 +9,7 @@ struct ReaderContainerView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(AppContainer.self) private var container
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.scenePhase) private var scenePhase
     @State private var showChrome = true
     @State private var showingSettings = false
     @State private var showingBookmarks = false
@@ -132,6 +133,15 @@ struct ReaderContainerView: View {
             #endif
         }
         .onChange(of: ttsSignature) { _, _ in viewModel.rebuildSpeechEngine() }
+        .onChange(of: scenePhase) { _, phase in
+            // Suspend the X4 socket in the background (read-aloud audio keeps playing);
+            // reconnect on return to foreground.
+            switch phase {
+            case .background: viewModel.remoteSession?.suspend()
+            case .active: viewModel.remoteSession?.resume()
+            default: break
+            }
+        }
     }
 
     /// Changes when the user picks a different TTS provider or voice — triggers a live
