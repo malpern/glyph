@@ -11,6 +11,10 @@ struct ReaderSettings: Codable, Equatable, Sendable {
     var font: ReaderFont = .original
     /// How read-aloud highlights/follows on the phone, and what's emitted to the X4.
     var highlightGranularity: HighlightGranularity = .sentence
+    /// Which TTS engine reads aloud.
+    var ttsProvider: TTSProvider = .apple
+    /// Selected OpenAI voice (one of `OpenAISpeechEngine.voices`).
+    var openAIVoice: String = "onyx"
 
     var epubPreferences: EPUBPreferences {
         EPUBPreferences(
@@ -21,6 +25,33 @@ struct ReaderSettings: Codable, Equatable, Sendable {
             publisherStyles: font == .original ? nil : false,
             theme: theme.readiumTheme
         )
+    }
+
+    init() {}
+
+    /// Tolerant decode: missing keys fall back to defaults so adding a setting never
+    /// wipes a user's existing preferences on upgrade.
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        theme = try c.decodeIfPresent(ReaderTheme.self, forKey: .theme) ?? .light
+        fontScale = try c.decodeIfPresent(Double.self, forKey: .fontScale) ?? 1.0
+        lineHeight = try c.decodeIfPresent(Double.self, forKey: .lineHeight) ?? 1.4
+        font = try c.decodeIfPresent(ReaderFont.self, forKey: .font) ?? .original
+        highlightGranularity = try c.decodeIfPresent(HighlightGranularity.self, forKey: .highlightGranularity) ?? .sentence
+        ttsProvider = try c.decodeIfPresent(TTSProvider.self, forKey: .ttsProvider) ?? .apple
+        openAIVoice = try c.decodeIfPresent(String.self, forKey: .openAIVoice) ?? "onyx"
+    }
+}
+
+/// The TTS engine that reads aloud. Cloud providers need an API key (Keychain);
+/// without one they fall back to Apple.
+enum TTSProvider: String, Codable, CaseIterable, Sendable {
+    case apple, openai
+    var label: String {
+        switch self {
+        case .apple: return "Apple"
+        case .openai: return "OpenAI"
+        }
     }
 }
 

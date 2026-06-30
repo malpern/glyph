@@ -66,9 +66,11 @@ final class ReaderViewModel {
             if let initialLocator { currentSpineIndex = spineIndex(for: initialLocator) ?? 0 }
             bookmarks = (try? await readingState.bookmarks(bookID: book.id)) ?? []
             highlights = (try? await readingState.highlights(bookID: book.id)) ?? []
+            let engine = SpeechEngineFactory.make(from: settingsStore?.settings ?? ReaderSettings())
             let speechController = SpeechController(
                 content: SpineContentProvider(fileURL: fileURL),
-                bookTitle: book.title
+                bookTitle: book.title,
+                engine: engine
             )
             speech = speechController
             let session = RemoteSessionController(
