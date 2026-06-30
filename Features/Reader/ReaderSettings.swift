@@ -10,7 +10,7 @@ struct ReaderSettings: Codable, Equatable, Sendable {
     var lineHeight: Double = 1.4
     var font: ReaderFont = .original
     /// How read-aloud highlights/follows on the phone, and what's emitted to the X4.
-    var highlightGranularity: HighlightGranularity = .paragraph
+    var highlightGranularity: HighlightGranularity = .sentence
 
     var epubPreferences: EPUBPreferences {
         EPUBPreferences(
@@ -29,14 +29,16 @@ struct ReaderSettings: Codable, Equatable, Sendable {
 /// - `.sentence` → highlight each sentence; emit `highlight{spine,para,sent}`.
 /// - `.paragraph` → highlight each paragraph; emit `highlight{spine,para}` (no `sent`).
 /// - `.page` → no text highlight, page-follow only; emit `goto{spine,para}`.
+/// - `.off` → no highlight, no page-follow, nothing sent to the X4 (audio only).
 /// The X4's e-ink refresh is slow, so coarser granularity = calmer screen.
 enum HighlightGranularity: String, Codable, CaseIterable, Sendable {
-    case sentence, paragraph, page
+    case sentence, paragraph, page, off
     var label: String {
         switch self {
         case .sentence: return "Sentence"
         case .paragraph: return "Paragraph"
         case .page: return "Page"
+        case .off: return "Off"
         }
     }
 }

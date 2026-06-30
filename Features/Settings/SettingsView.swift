@@ -27,7 +27,7 @@ struct SettingsView: View {
                 } header: {
                     Text("Read-aloud")
                 } footer: {
-                    Text("How the spoken position is highlighted and followed — and how often the X4 e-ink screen refreshes. Paragraph is calmer; Sentence is best for active read-along.")
+                    Text("How the spoken position is highlighted and followed — and how often the X4 e-ink screen refreshes. Sentence is best for active read-along; Paragraph is calmer; Off is audio-only (no highlight, nothing sent to the X4).")
                 }
 
                 Section {

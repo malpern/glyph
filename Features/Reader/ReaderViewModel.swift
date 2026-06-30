@@ -115,6 +115,8 @@ final class ReaderViewModel {
         case .page:
             let l = locator(sentence.paragraphText, before: nil, after: nil)
             return (nil, l)
+        case .off:
+            return (nil, nil)   // audio only — no highlight, no follow
         }
     }
 

@@ -95,6 +95,8 @@ final class RemoteSessionController {
         case .page:
             guard paragraphChanged else { return }
             client.send(.goto(spine: spine, para: para))
+        case .off:
+            return   // nothing sent to the X4
         }
     }
 

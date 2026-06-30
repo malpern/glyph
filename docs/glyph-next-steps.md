@@ -22,12 +22,13 @@ requests) is preserved verbatim at the bottom as the canonical contract referenc
   AirPods + the X4. Implemented as a Readium text-locator `Decoration` (`tts` group) —
   Readium fuzzy-matches the text in the page DOM, so no precise DOM range is needed. See
   `SpeechController.spokenSentence`, `ReaderViewModel.ttsLocators`, `EPUBReaderView`.
-- **Read-aloud granularity setting.** One Sentence / Paragraph / Page setting (default
-  **Paragraph**) drives the phone highlight, the page-follow cadence, *and* what's emitted
-  to the X4 — sentence highlight / paragraph mark (`sent` omitted) / `goto`. In
-  Paragraph/Page the follow target only changes per paragraph, so the page turns at most
-  once per paragraph (fixes per-sentence follow jumpiness). `RemoteCommand.highlight`'s
-  `sentence` is now optional. See `HighlightGranularity`, `RemoteSessionController`.
+- **Read-aloud granularity setting.** One **Sentence / Paragraph / Page / Off** setting
+  (default **Sentence**) drives the phone highlight, the page-follow cadence, *and* what's
+  emitted to the X4 — `highlight{spine,para,sent}` / paragraph mark `highlight{spine,para}`
+  (`sent` omitted) / `goto{spine,para}` / nothing (Off = audio-only). In Paragraph/Page the
+  follow target only changes per paragraph, so the page turns at most once per paragraph
+  (fixes per-sentence follow jumpiness). `RemoteCommand.highlight`'s `sentence` is now
+  optional. See `HighlightGranularity`, `RemoteSessionController`.
 - **Bookmarks & highlights.** Bookmark the current page; select text → **Highlight** (4
   colours); both listed in one **Annotations** sheet (Bookmarks | Highlights) with
   tap-to-jump + swipe-to-delete; tap a highlight to recolour/delete. Persisted via SwiftData
