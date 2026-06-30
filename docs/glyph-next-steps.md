@@ -35,10 +35,16 @@ requests) is preserved verbatim at the bottom as the canonical contract referenc
   behind `ReadingStateRepository` (each record carries its own `updatedAt`/`deletedAt`, so
   sync is a drop-in later). Highlights render via a `highlights` decoration group. See
   `AnnotationsView`, `HighlightStyle`, `ReaderHostController`, `ReaderViewModel`.
+- **Multi-provider TTS.** Read aloud with **Apple** (on-device, free), **OpenAI**, or
+  **ElevenLabs** — picked in the in-reader **Aa → Read-aloud** menu; per-provider voice +
+  API keys in **Settings → TTS keys** (Keychain). A pluggable `SpeechEngine` (one sentence
+  at a time, so no word-timing needed) keeps the X4 + highlight sync intact; cloud engines
+  **prefetch** the next sentence to hide latency, **fall back to Apple** on any failure, and
+  switch **live** when you change voice. See `Features/Reader/Speech/`.
 - **Deploy pipeline.** `fastlane` lanes (`beta`, `register_app_id`, `add_internal_tester`,
-  `tf_status`) — autonomous build → TestFlight via the App Store Connect API key. Live on
-  TestFlight as **"Glyph: Read & Listen"** (`dev.malpern.Glyph`). Apple capability +
-  recipe documented in `~/.config/agent/ACCESS.md`.
+  `tf_status`, `tf_invite`, `tf_diag`) — autonomous build → TestFlight via the App Store
+  Connect API key. Live on TestFlight as **"Glyph: Read & Listen"** (`dev.malpern.Glyph`).
+  Apple capability + recipe documented in `~/.config/agent/ACCESS.md`.
 
 ## Next (prioritized)
 
@@ -57,9 +63,7 @@ requests) is preserved verbatim at the bottom as the canonical contract referenc
    Confirmed present in **both Xcode 27 beta 1 (27A5194q) and beta 2 (27A5209h)**; `singlefile`
    did not help. It's an unfixed toolchain bug — revisit on the next toolchain bump
    (`fastlane beta` re-test is one command). Negligible impact for a reader app.
-6. **TTS voice selection.** Firmware noted the phone and X4 voices "both sound like OpenAI
-   voices." Pin the intended `AVSpeechSynthesisVoice` and surface a picker.
-7. **`pos` local authority.** When the X4 user turns a page with the physical buttons, the
+6. **`pos` local authority.** When the X4 user turns a page with the physical buttons, the
    phone should pause TTS and follow. The bridge adopts the position; confirm the
    pause-TTS-on-`pos` behavior end-to-end.
 
