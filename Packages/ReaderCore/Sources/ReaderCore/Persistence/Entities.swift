@@ -61,14 +61,17 @@ final class BookmarkEntity {
     var createdAt: Date
     var updatedAt: Date
     var deletedAt: Date?
+    /// Unsynced local change (add/delete). Defaulted so it's a lightweight migration.
+    var pendingSync: Bool = false
 
-    init(id: UUID, bookID: String, locator: Data, createdAt: Date, updatedAt: Date, deletedAt: Date?) {
+    init(id: UUID, bookID: String, locator: Data, createdAt: Date, updatedAt: Date, deletedAt: Date?, pendingSync: Bool = false) {
         self.id = id
         self.bookID = bookID
         self.locator = locator
         self.createdAt = createdAt
         self.updatedAt = updatedAt
         self.deletedAt = deletedAt
+        self.pendingSync = pendingSync
     }
 }
 
@@ -82,8 +85,10 @@ final class HighlightEntity {
     var createdAt: Date
     var updatedAt: Date
     var deletedAt: Date?
+    /// Unsynced local change (add/update/delete). Defaulted → lightweight migration.
+    var pendingSync: Bool = false
 
-    init(id: UUID, bookID: String, locator: Data, text: String?, color: String?, createdAt: Date, updatedAt: Date, deletedAt: Date?) {
+    init(id: UUID, bookID: String, locator: Data, text: String?, color: String?, createdAt: Date, updatedAt: Date, deletedAt: Date?, pendingSync: Bool = false) {
         self.id = id
         self.bookID = bookID
         self.locator = locator
@@ -92,5 +97,6 @@ final class HighlightEntity {
         self.createdAt = createdAt
         self.updatedAt = updatedAt
         self.deletedAt = deletedAt
+        self.pendingSync = pendingSync
     }
 }

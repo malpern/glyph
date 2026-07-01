@@ -47,8 +47,8 @@ extension BookmarkEntity {
         Bookmark(id: id, bookID: bookID, locator: locator, createdAt: createdAt, updatedAt: updatedAt, deletedAt: deletedAt)
     }
 
-    static func make(from b: Bookmark) -> BookmarkEntity {
-        BookmarkEntity(id: b.id, bookID: b.bookID, locator: b.locator, createdAt: b.createdAt, updatedAt: b.updatedAt, deletedAt: b.deletedAt)
+    static func make(from b: Bookmark, pendingSync: Bool = false) -> BookmarkEntity {
+        BookmarkEntity(id: b.id, bookID: b.bookID, locator: b.locator, createdAt: b.createdAt, updatedAt: b.updatedAt, deletedAt: b.deletedAt, pendingSync: pendingSync)
     }
 }
 
@@ -57,7 +57,7 @@ extension HighlightEntity {
         Highlight(id: id, bookID: bookID, locator: locator, text: text, color: color, createdAt: createdAt, updatedAt: updatedAt, deletedAt: deletedAt)
     }
 
-    static func make(from h: Highlight) -> HighlightEntity {
-        HighlightEntity(id: h.id, bookID: h.bookID, locator: h.locator, text: h.text, color: h.color, createdAt: h.createdAt, updatedAt: h.updatedAt, deletedAt: h.deletedAt)
+    static func make(from h: Highlight, pendingSync: Bool = false) -> HighlightEntity {
+        HighlightEntity(id: h.id, bookID: h.bookID, locator: h.locator, text: h.text, color: h.color, createdAt: h.createdAt, updatedAt: h.updatedAt, deletedAt: h.deletedAt, pendingSync: pendingSync)
     }
 }

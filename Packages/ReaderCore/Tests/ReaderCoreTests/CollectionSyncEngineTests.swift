@@ -131,4 +131,76 @@ private func makeEngine<R: SyncableRecord>(
         #expect(onB?.color == "green")
         #expect(onB?.text == "hello")
     }
+
+    // MARK: - Over the real SwiftDataStore (persistence + engine integration)
+
+    private func bookmarkEngine(store: SwiftDataStore, remote: MemRemote<Bookmark>) -> CollectionSyncEngine<Bookmark> {
+        CollectionSyncEngine(
+            store: .init(
+                dirty: { try await store.dirtyBookmarks() },
+                applyRemote: { try await store.applyRemoteBookmark($0) },
+                clearDirty: { try await store.clearBookmarkDirty(id: $0, ifUpdatedAt: $1) }
+            ),
+            transport: .init(
+                push: { await remote.push($0, $1) },
+                fetchAll: { await remote.fetchAll($0) },
+                observe: { _ in AsyncThrowingStream { $0.finish() } }
+            )
+        )
+    }
+
+    @Test func bookmarkAddAndDeleteSyncAcrossRealStores() async throws {
+        let remote = MemRemote<Bookmark>()
+        let deviceA = try ReaderStore.make(inMemory: true)
+        let deviceB = try ReaderStore.make(inMemory: true)
+        let engineA = bookmarkEngine(store: deviceA, remote: remote)
+        let engineB = bookmarkEngine(store: deviceB, remote: remote)
+        await engineA.start(userID: "u"); await engineB.start(userID: "u")
+
+        // Add on A → dirty → push → B reconciles and sees it.
+        let bm = Bookmark(bookID: "book-1", locator: Data("p3".utf8))
+        try await deviceA.addBookmark(bm)
+        await engineA.pushDirty()
+        await engineB.reconcile()
+        #expect(try await deviceB.bookmarks(bookID: "book-1").contains { $0.id == bm.id })
+        #expect(try await deviceA.dirtyBookmarks().isEmpty)   // push cleared dirty
+
+        // Delete on A → tombstone → propagates → gone on B.
+        try await deviceA.deleteBookmark(id: bm.id)
+        await engineA.pushDirty()
+        await engineB.reconcile()
+        #expect(try await deviceB.bookmarks(bookID: "book-1").isEmpty)
+    }
+
+    @Test func highlightAddAndRecolorSyncAcrossRealStores() async throws {
+        let remote = MemRemote<Highlight>()
+        let deviceA = try ReaderStore.make(inMemory: true)
+        let deviceB = try ReaderStore.make(inMemory: true)
+        func engine(_ store: SwiftDataStore) -> CollectionSyncEngine<Highlight> {
+            CollectionSyncEngine(
+                store: .init(
+                    dirty: { try await store.dirtyHighlights() },
+                    applyRemote: { try await store.applyRemoteHighlight($0) },
+                    clearDirty: { try await store.clearHighlightDirty(id: $0, ifUpdatedAt: $1) }
+                ),
+                transport: .init(
+                    push: { await remote.push($0, $1) },
+                    fetchAll: { await remote.fetchAll($0) },
+                    observe: { _ in AsyncThrowingStream { $0.finish() } }
+                )
+            )
+        }
+        let engineA = engine(deviceA), engineB = engine(deviceB)
+        await engineA.start(userID: "u"); await engineB.start(userID: "u")
+
+        let hl = Highlight(bookID: "book-1", locator: Data("sel".utf8), text: "hi", color: "yellow")
+        try await deviceA.addHighlight(hl)
+        await engineA.pushDirty(); await engineB.reconcile()
+        #expect(try await deviceB.highlights(bookID: "book-1").first?.color == "yellow")
+
+        // Recolor on A → newer updatedAt wins on B.
+        try await deviceA.updateHighlight(Highlight(id: hl.id, bookID: "book-1", locator: hl.locator, text: "hi", color: "pink"))
+        await engineA.pushDirty(); await engineB.reconcile()
+        #expect(try await deviceB.highlights(bookID: "book-1").first?.color == "pink")
+    }
 }

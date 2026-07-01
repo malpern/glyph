@@ -86,7 +86,7 @@ public actor SwiftDataStore: LibraryRepository, ReadingStateRepository {
     }
 
     public func addBookmark(_ bookmark: Bookmark) throws {
-        modelContext.insert(BookmarkEntity.make(from: bookmark))
+        modelContext.insert(BookmarkEntity.make(from: bookmark, pendingSync: true))
         try modelContext.save()
     }
 
@@ -94,6 +94,7 @@ public actor SwiftDataStore: LibraryRepository, ReadingStateRepository {
         guard let entity = try bookmarkEntity(id: id) else { return }
         entity.deletedAt = Date()      // tombstone
         entity.updatedAt = Date()
+        entity.pendingSync = true      // propagate the deletion
         try modelContext.save()
     }
 
@@ -102,7 +103,7 @@ public actor SwiftDataStore: LibraryRepository, ReadingStateRepository {
     }
 
     public func addHighlight(_ highlight: Highlight) throws {
-        modelContext.insert(HighlightEntity.make(from: highlight))
+        modelContext.insert(HighlightEntity.make(from: highlight, pendingSync: true))
         try modelContext.save()
     }
 
@@ -112,6 +113,7 @@ public actor SwiftDataStore: LibraryRepository, ReadingStateRepository {
         entity.text = highlight.text
         entity.color = highlight.color
         entity.updatedAt = Date()
+        entity.pendingSync = true
         try modelContext.save()
     }
 
@@ -119,6 +121,7 @@ public actor SwiftDataStore: LibraryRepository, ReadingStateRepository {
         guard let entity = try highlightEntity(id: id) else { return }
         entity.deletedAt = Date()      // tombstone
         entity.updatedAt = Date()
+        entity.pendingSync = true      // propagate the deletion
         try modelContext.save()
     }
 
