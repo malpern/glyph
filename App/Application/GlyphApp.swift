@@ -19,7 +19,10 @@ struct GlyphApp: App {
                 .task { await container.startSync() }
                 .onChange(of: scenePhase) { _, phase in
                     if phase == .active {
-                        Task { await container.syncEngine.reconcile() }
+                        Task {
+                            await container.syncEngine.reconcile()
+                            await container.annotationSync.reconcile()
+                        }
                     }
                 }
         }

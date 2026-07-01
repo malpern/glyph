@@ -26,6 +26,7 @@ final class ReaderViewModel {
     private let fileURL: URL
     private let readingState: any ReadingStateRepository
     private let syncEngine: ReadingStateSyncEngine?
+    private let annotationSync: AnnotationSyncEngines?
     private var saveTask: Task<Void, Never>?
     private var latestLocator: Locator?
     private var publication: Publication?
@@ -48,12 +49,14 @@ final class ReaderViewModel {
         book: Book,
         fileURL: URL,
         readingState: any ReadingStateRepository,
-        syncEngine: ReadingStateSyncEngine? = nil
+        syncEngine: ReadingStateSyncEngine? = nil,
+        annotationSync: AnnotationSyncEngines? = nil
     ) {
         self.book = book
         self.fileURL = fileURL
         self.readingState = readingState
         self.syncEngine = syncEngine
+        self.annotationSync = annotationSync
     }
 
     /// Wire app-wide settings (read-aloud granularity). Call before `load()`.
@@ -151,6 +154,7 @@ final class ReaderViewModel {
 
     private func reloadBookmarks() async {
         bookmarks = (try? await readingState.bookmarks(bookID: book.id)) ?? []
+        await annotationSync?.pushDirty()   // propagate the local change to other devices
     }
 
     // MARK: Table of contents
@@ -220,6 +224,7 @@ final class ReaderViewModel {
 
     private func reloadHighlights() async {
         highlights = (try? await readingState.highlights(bookID: book.id)) ?? []
+        await annotationSync?.pushDirty()   // propagate the local change to other devices
     }
 
     #if DEBUG

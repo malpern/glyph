@@ -21,10 +21,12 @@ struct ReaderContainerView: View {
         book: Book,
         fileURL: URL,
         readingState: any ReadingStateRepository,
-        syncEngine: ReadingStateSyncEngine?
+        syncEngine: ReadingStateSyncEngine?,
+        annotationSync: AnnotationSyncEngines?
     ) {
         _viewModel = State(initialValue: ReaderViewModel(
-            book: book, fileURL: fileURL, readingState: readingState, syncEngine: syncEngine
+            book: book, fileURL: fileURL, readingState: readingState,
+            syncEngine: syncEngine, annotationSync: annotationSync
         ))
     }
 

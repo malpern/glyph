@@ -17,6 +17,8 @@ final class AppContainer {
     let storage: BookStorage
     /// Reconciles local reading positions with the cloud. Started in `startSync()`.
     let syncEngine: ReadingStateSyncEngine
+    /// Reconciles bookmarks + highlights with the cloud. Started in `startSync()`.
+    let annotationSync: AnnotationSyncEngines
     /// App-wide reading appearance (theme/font/size/spacing).
     let readerSettings = ReaderSettingsStore()
 
@@ -48,6 +50,38 @@ final class AppContainer {
         self.store = stack.store
         self.storage = stack.storage
         self.syncEngine = ReadingStateSyncEngine(store: stack.store, remote: FirebaseSyncClient())
+        self.annotationSync = Self.makeAnnotationSync(store: stack.store)
+    }
+
+    /// Build the bookmark + highlight sync engines: closures bridge the local store's
+    /// sync methods to the Firestore annotation client. Keeps `ReaderCore` backend-agnostic.
+    private static func makeAnnotationSync(store: SwiftDataStore) -> AnnotationSyncEngines {
+        let client = FirebaseAnnotationClient()
+        let bookmarks = CollectionSyncEngine<Bookmark>(
+            store: .init(
+                dirty: { try await store.dirtyBookmarks() },
+                applyRemote: { try await store.applyRemoteBookmark($0) },
+                clearDirty: { try await store.clearBookmarkDirty(id: $0, ifUpdatedAt: $1) }
+            ),
+            transport: .init(
+                push: { try await client.pushBookmarks($0, userID: $1) },
+                fetchAll: { try await client.fetchBookmarks(userID: $0) },
+                observe: { client.observeBookmarks(userID: $0) }
+            )
+        )
+        let highlights = CollectionSyncEngine<Highlight>(
+            store: .init(
+                dirty: { try await store.dirtyHighlights() },
+                applyRemote: { try await store.applyRemoteHighlight($0) },
+                clearDirty: { try await store.clearHighlightDirty(id: $0, ifUpdatedAt: $1) }
+            ),
+            transport: .init(
+                push: { try await client.pushHighlights($0, userID: $1) },
+                fetchAll: { try await client.fetchHighlights(userID: $0) },
+                observe: { client.observeHighlights(userID: $0) }
+            )
+        )
+        return AnnotationSyncEngines(bookmarks: bookmarks, highlights: highlights)
     }
 
     /// Drive the sync engine from auth state: start on sign-in, stop on sign-out.
@@ -55,8 +89,10 @@ final class AppContainer {
         for await userID in keyAuth.userIDs() {
             if let userID {
                 await syncEngine.start(userID: userID)
+                await annotationSync.start(userID: userID)
             } else {
                 await syncEngine.stop()
+                await annotationSync.stop()
             }
         }
     }

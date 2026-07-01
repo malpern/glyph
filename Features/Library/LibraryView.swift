@@ -49,7 +49,8 @@ struct LibraryView: View {
                     book: book,
                     fileURL: container.storage.absoluteURL(for: book.filePath),
                     readingState: container.readingState,
-                    syncEngine: container.syncEngine
+                    syncEngine: container.syncEngine,
+                    annotationSync: container.annotationSync
                 )
             }
             .fileImporter(
