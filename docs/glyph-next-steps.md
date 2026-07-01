@@ -46,26 +46,32 @@ requests) is preserved verbatim at the bottom as the canonical contract referenc
   Connect API key. Live on TestFlight as **"Glyph: Read & Listen"** (`dev.malpern.Glyph`).
   Apple capability + recipe documented in `~/.config/agent/ACCESS.md`.
 
+- **Annotation sync.** Bookmarks + highlights sync cross-device on the same LWW/tombstone
+  path as reading position: a generic `CollectionSyncEngine<Record>` + `users/{uid}/
+  bookmarks` & `/highlights` Firestore collections, driven from `AppContainer` and pushed
+  after every local change. See `Sync/CollectionSyncEngine.swift`, `FirebaseAnnotationClient`.
+- **Reverse-resume + `pos` authority + iOS 27 pass.** On connect the phone pushes its
+  position to the X4 (`goto`, phone-wins); a physical `pos` page-turn pauses read-aloud and
+  follows on screen. Plus a full iOS 27 audit landed (audio-session interruption/route
+  handling, privacy manifest, Liquid-Glass toolbar, accessibility, Open-with-EPUB).
+
 ## Next (prioritized)
 
 1. **X4 real-device end-to-end test** (page-follow + sentence highlight + position bridge,
-   across all three granularities). Gated on hardware. (Task X4.)
-2. **Sync bookmarks & highlights.** The records are sync-ready (id + `updatedAt`/`deletedAt`);
-   extend the engine (or add parallel ones) + Firestore collections so annotations follow
-   the same cross-device path as reading position.
-3. **Follow refinement (optional).** Paragraph/Page cadence already removes most
-   per-sentence jumpiness. A further nicety: suppress auto-follow briefly after a *manual*
-   page turn (so re-reading isn't yanked), or only re-center when the unit is off-screen.
-4. **Reverse-resume**: open the X4 → it jumps to the phone's newer cloud position. Gated on
-   the firmware adding a freshness marker to `ready` so the phone knows whose position wins.
+   across all three granularities + reverse-resume + `pos`). Gated on hardware. (Task X4.)
+2. **Live in-session annotation refresh.** Annotation sync applies remote changes to the
+   store; an open book only reflects them on next open. Nudge the reader to reload its
+   bookmark/highlight lists when the annotation listener applies a remote change.
+3. **Reverse-resume refinement.** Phone-wins-on-connect ships; refine so reading *ahead* on
+   the X4 before connecting isn't yanked back (treat `ready`'s position as a candidate,
+   override only when the cloud is meaningfully ahead).
+4. **Follow refinement (optional).** Suppress auto-follow briefly after a *manual* page turn
+   (so re-reading isn't yanked), or only re-center when the unit is off-screen.
 5. **Release-build optimization.** Currently archived with `SWIFT_OPTIMIZATION_LEVEL=-Onone`
    to dodge a Swift optimizer crash compiling SwiftSoup (a Readium dep) in Release.
    Confirmed present in **both Xcode 27 beta 1 (27A5194q) and beta 2 (27A5209h)**; `singlefile`
    did not help. It's an unfixed toolchain bug — revisit on the next toolchain bump
    (`fastlane beta` re-test is one command). Negligible impact for a reader app.
-6. **`pos` local authority.** When the X4 user turns a page with the physical buttons, the
-   phone should pause TTS and follow. The bridge adopts the position; confirm the
-   pause-TTS-on-`pos` behavior end-to-end.
 
 ---
 
